@@ -1,0 +1,15 @@
+{
+  "name": "Pão Duro — Compras",
+  "short_name": "Pão Duro",
+  "description": "Leitor de cupom fiscal com GPS para importação no Pão Duro",
+  "start_url": "/pao-duro/",
+  "scope": "/pao-duro/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#3B6D11",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
