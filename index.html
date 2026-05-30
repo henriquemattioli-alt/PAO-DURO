@@ -424,53 +424,66 @@ function processarCupom(e) {
     return;
   }
 
-  console.log('processarCupom iniciado, chave:', geminiKey ? 'OK' : 'VAZIA');
-  alert('Iniciando processamento...');
   const reader = new FileReader();
   reader.onload = function(ev) {
-    alert('Foto lida, enviando para Gemini...');
     const preview = document.getElementById('cupomPreview');
     preview.src = ev.target.result; preview.style.display = 'block';
     show('cupomProcessando');
     hide('cardItens'); hide('cardPagamento'); hide('cardExport');
-    const base64 = ev.target.result.split(',')[1];
 
-    fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + geminiKey, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-            { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto e legivel do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como numeros decimais com ponto.' }
-          ]
-        }],
-        generationConfig: { temperature: 0.1 }
-      })
-    }).then(function(r) { return r.json(); }).then(function(data) {
-      const txt = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(txt);
-      hide('cupomProcessando');
-      if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
-      if (parsed.pagamento) {
-        document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
-        show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
-      } else {
-        show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
-      }
-      if (parsed.itens && parsed.itens.length > 0) {
-        state.itens = parsed.itens.map(function(i) {
-          return { produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0 };
-        });
-        save(); renderItens();
-        show('cardItens'); show('cardExport'); atualizarTotais();
-      }
-      toast('Cupom processado com sucesso!');
-    }).catch(function(err) {
-      hide('cupomProcessando');
-      alert('ERRO: ' + err.message);
-      toast('Erro ao processar - tente novamente');
-    });
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxW = 1024;
+      const scale = img.width > maxW ? maxW / img.width : 1;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const base64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+
+      fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + geminiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto e legivel do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como numeros decimais com ponto.' }
+            ]
+          }],
+          generationConfig: { temperature: 0.1 }
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.candidates || !data.candidates[0]) {
+          hide('cupomProcessando');
+          alert('Erro Gemini: ' + JSON.stringify(data));
+          return;
+        }
+        const txt = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(txt);
+        hide('cupomProcessando');
+        if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
+        if (parsed.pagamento) {
+          document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
+          show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
+        } else {
+          show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
+        }
+        if (parsed.itens && parsed.itens.length > 0) {
+          state.itens = parsed.itens.map(function(i) {
+            return { produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0 };
+          });
+          save(); renderItens();
+          show('cardItens'); show('cardExport'); atualizarTotais();
+        }
+        toast('Cupom processado com sucesso!');
+      }).catch(function(err) {
+        hide('cupomProcessando');
+        alert('ERRO: ' + err.message);
+        toast('Erro ao processar - tente novamente');
+      });
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
