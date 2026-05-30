@@ -468,9 +468,8 @@ function processarCupom(e) {
       toast('Cupom processado com sucesso!');
     }).catch(function(err) {
       hide('cupomProcessando');
-      alert('ERRO: ' + err.message + ' | ' + JSON.stringify(err));
-      localStorage.removeItem('pd_gemini_key');
-      toast('Erro ao processar - verifique a chave e tente novamente');
+      alert('ERRO: ' + err.message);
+      toast('Erro ao processar - tente novamente');
     });
   };
   reader.readAsDataURL(file);
