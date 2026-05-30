@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#3B6D11">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Pão Duro">
+  <title>Pão Duro — Compras</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    :root {
+      --green: #3B6D11;
+      --green-light: #EAF3DE;
+      --green-mid: #639922;
+      --amber: #BA7517;
+      --amber-light: #FAEEDA;
+      --red-light: #FCEBEB;
+      --red: #A32D2D;
+      --bg: #ffffff;
+      --bg2: #f5f5f5;
+      --bg3: #ebebeb;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text2: #555;
+      --text3: #888;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111;
+        --bg2: #1e1e1e;
+        --bg3: #2a2a2a;
+        --border: #333;
+        --text: #f0f0f0;
+        --text2: #aaa;
+        --text3: #666;
+        --green-light: #1a2e0a;
+        --amber-light: #2e1e00;
+        --red-light: #2e0a0a;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { max-width: 480px; margin: 0 auto; padding: 1rem; padding-bottom: 2rem; }
+    .header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .logo { width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--green-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .logo i { font-size: 22px; color: var(--green); }
+    .htitle { font-size: 18px; font-weight: 600; color: var(--text); }
+    .hsub { font-size: 12px; color: var(--text3); }
+    .counter { background: var(--green-light); color: var(--green); border-radius: 99px; font-size: 11px; padding: 2px 8px; margin-left: 6px; font-weight: 600; }
+    .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1rem; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: .8rem; display: flex; align-items: center; gap: 6px; }
+    input, select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg); color: var(--text); outline: none; font-family: inherit; }
+    input:focus, select:focus { border-color: var(--green-mid); }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 10px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; transition: opacity .15s; }
+    .btn:active { opacity: .8; }
+    .btn-green { background: var(--green-light); color: var(--green); border-color: var(--green-mid); }
+    .btn-gray { background: var(--bg2); color: var(--text); border-color: var(--border); }
+    .btn-danger { background: var(--red-light); color: var(--red); border-color: var(--red); }
+    .btn-sm { padding: 7px 12px; font-size: 13px; }
+    .field { margin-bottom: .75rem; }
+    .field label { font-size: 12px; color: var(--text3); display: block; margin-bottom: 4px; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 10px; border-radius: 99px; }
+    .chip-ok { background: var(--green-light); color: var(--green); }
+    .chip-warn { background: var(--amber-light); color: var(--amber); }
+    .chip-info { background: #E6F1FB; color: #185FA5; }
+    .confirm-box { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; }
+    .confirm-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+    .confirm-value { font-size: 15px; font-weight: 600; }
+    .confirm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .btn-yes { background: var(--green-light); color: var(--green); border: 1px solid var(--green-mid); border-radius: var(--radius-sm); padding: 8px; font-size: 13px; cursor: pointer; text-align: center; font-weight: 500; }
+    .btn-no { background: var(--red-light); color: var(--red); border: 1px solid var(--red); border-radius: var(--radius-sm); padding: 8px; font-size: 13px; cursor: pointer; text-align: center; font-weight: 500; }
+    .preview-img { width: 100%; max-height: 200px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 8px; display: none; }
+    .hidden { display: none !important; }
+    .items-table { width: 100%; border-collapse: collapse; }
+    .items-table th { font-size: 11px; color: var(--text3); font-weight: 600; text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+    .items-table td { font-size: 13px; padding: 5px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .items-table td input { border: none; background: transparent; font-size: 13px; color: var(--text); padding: 2px 4px; outline: none; }
+    .items-table td input:focus { background: var(--bg2); border-radius: 4px; }
+    .items-table tr:last-child td { border-bottom: none; }
+    .remove-btn { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 16px; padding: 2px 4px; }
+    .remove-btn:active { color: var(--red); }
+    .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+    .total-box { background: var(--bg2); border-radius: var(--radius-sm); padding: .75rem; text-align: center; }
+    .total-label { font-size: 11px; color: var(--text3); }
+    .total-val { font-size: 24px; font-weight: 600; }
+    .total-val.green { color: var(--green); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+    .import-note { font-size: 12px; color: var(--text3); margin-top: 6px; line-height: 1.5; }
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--green-light); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -3px; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 9px 20px; border-radius: var(--radius); font-size: 13px; display: none; z-index: 9999; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+    .row-flex { display: flex; gap: 8px; align-items: center; }
+    .ml-auto { margin-left: auto; }
+  </style>
+</head>
+
+  <body>
+<div class="app">
+  <div class="header">
+    <div class="logo"><i class="ti ti-receipt"></i></div>
+    <div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span></div>
+      <div class="hsub">Leitor de cupom fiscal</div>
+    </div>
+    <button class="btn btn-gray btn-sm ml-auto" style="width:auto" onclick="novaCompra()">
+      <i class="ti ti-refresh"></i> Nova
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-map-pin"></i> Estabelecimento</div>
+    <div id="gpsStatus" class="chip chip-info" style="margin-bottom:8px">
+      <i class="ti ti-location"></i> Aguardando GPS...
+    </div>
+    <button class="btn btn-green" onclick="detectarLocal()">
+      <i class="ti ti-current-location"></i> Detectar minha localização
+    </button>
+    <div id="confirmEstab" class="confirm-box hidden">
+      <div class="confirm-label">Estabelecimento encontrado</div>
+      <div class="confirm-value" id="estabNomeDetectado"></div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px" id="estabEndDetectado"></div>
+      <div class="confirm-btns">
+        <div class="btn-yes" onclick="confirmarEstab(true)"><i class="ti ti-check"></i> Sim</div>
+        <div class="btn-no" onclick="confirmarEstab(false)"><i class="ti ti-x"></i> Não</div>
+      </div>
+    </div>
+    <div id="manualEstab" class="hidden" style="margin-top:8px">
+      <div class="field">
+        <label>Estabelecimentos salvos</label>
+        <select id="estabSelect" onchange="estabSelecionado()"></select>
+      </div>
+      <div class="field">
+        <label>Ou informe manualmente</label>
+        <div class="row-flex">
+          <input type="text" id="estabManual" placeholder="Nome do estabelecimento" style="flex:1">
+          <button class="btn btn-green btn-sm" style="width:auto" onclick="salvarEstabManual()">
+            <i class="ti ti-check"></i>
+          </button>
+        </div>
+      </div>
+      <div class="row-flex" style="margin-top:4px">
+        <input type="file" accept=".csv,.txt" id="csvEstabInput" class="hidden" onchange="importarEstabs(event)">
+        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvEstabInput').click()">
+          <i class="ti ti-upload"></i> Importar CSV do Pão Duro
+        </button>
+      </div>
+      <div class="import-note">CSV com um estabelecimento por linha. Usa a primeira coluna.</div>
+    </div>
+    <div id="estabConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:14px;font-weight:600" id="estabFinal"></div>
+        <div style="font-size:12px;color:var(--text3)" id="estabCidadeFinal"></div>
+      </div>
+      <button class="btn btn-gray btn-sm" style="width:auto" onclick="trocarEstab()">
+        <i class="ti ti-edit"></i> Trocar
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
+    <button class="btn btn-green" onclick="document.getElementById('cupomInput').click()">
+      <i class="ti ti-camera"></i> Fotografar cupom fiscal
+    </button>
+    <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
+    <img id="cupomPreview" class="preview-img" alt="Cupom">
+    <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
+      <span class="spinner"></span> Extraindo dados do cupom...
+    </div>
+  </div>
+
+  <div class="card hidden" id="cardPagamento">
+    <div class="card-title"><i class="ti ti-credit-card"></i> Forma de pagamento</div>
+    <div id="confirmPgto" class="confirm-box">
+      <div class="confirm-label">Detectado no cupom</div>
+      <div class="confirm-value" id="pgtoDetectado"></div>
+      <div class="confirm-btns">
+        <div class="btn-yes" onclick="confirmarPgto(true)"><i class="ti ti-check"></i> Sim</div>
+        <div class="btn-no" onclick="confirmarPgto(false)"><i class="ti ti-x"></i> Não</div>
+      </div>
+    </div>
+    <div id="manualPgto" class="hidden" style="margin-top:8px">
+      <div class="field">
+        <label>Forma de pagamento</label>
+        <select id="pgtoSelect">
+          <option value="">Selecione...</option>
+          <option>Dinheiro</option>
+          <option>Pix</option>
+          <option>Débito</option>
+          <option>Crédito</option>
+        </select>
+      </div>
+      <button class="btn btn-green btn-sm" style="margin-top:6px" onclick="salvarPgtoManual()">
+        <i class="ti ti-check"></i> Confirmar
+      </button>
+    </div>
+    <div id="pgtoConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:600" id="pgtoFinal"></span>
+      <button class="btn btn-gray btn-sm" style="width:auto" onclick="trocarPgto()">
+        <i class="ti ti-edit"></i> Trocar
+      </button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="cardItens">
+    <div class="card-title"><i class="ti ti-list"></i> Itens — edite os nomes se necessário</div>
+    <table class="items-table">
+      <thead><tr>
+        <th style="width:48%">Produto</th>
+        <th style="width:20%">Qtd</th>
+        <th style="width:24%">Valor R$</th>
+        <th style="width:8%"></th>
+      </tr></thead>
+      <tbody id="itensBody"></tbody>
+    </table>
+    <button class="btn btn-gray btn-sm" style="margin-top:.75rem" onclick="addItemManual()">
+      <i class="ti ti-plus"></i> Adicionar item
+    </button>
+  </div>
+
+  <div id="cardExport" class="hidden">
+    <hr class="divider">
+    <div class="totals">
+      <div class="total-box">
+        <div class="total-label">Itens</div>
+        <div class="total-val" id="totalItens">0</div>
+      </div>
+      <div class="total-box">
+        <div class="total-label">Total</div>
+        <div class="total-val green" id="totalValor">R$ 0,00</div>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="exportarCSV()">
+      <i class="ti ti-download"></i> Exportar CSV para o Pão Duro
+    </button>
+    <button class="btn btn-danger" style="margin-top:8px" onclick="novaCompra()">
+      <i class="ti ti-trash"></i> Limpar e nova compra
+    </button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let state = {
+  estab: '', cidade: '', pgto: '', itens: [],
+  estabs: JSON.parse(localStorage.getItem('pd_estabs') || '[]')
+};
+
+function save() { localStorage.setItem('pd_state', JSON.stringify(state)); }
+
+function load() {
+  const s = localStorage.getItem('pd_state');
+  if (s) { try { const p = JSON.parse(s); state = { ...state, ...p }; } catch {} }
+  populateEstabSelect();
+  restoreUI();
+}
+
+function toast(msg, dur = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.style.display = 'none', dur);
+}
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+function populateEstabSelect() {
+  const sel = document.getElementById('estabSelect');
+  sel.innerHTML = '<option value="">Selecione ou digite abaixo...</option>';
+  state.estabs.forEach(e => {
+    const o = document.createElement('option');
+    o.value = o.textContent = e;
+    sel.appendChild(o);
+  });
+}
+
+function importarEstabs(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+    let count = 0;
+    lines.forEach(l => {
+      const nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
+      if (nome && !state.estabs.includes(nome)) { state.estabs.push(nome); count++; }
+    });
+    localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
+    populateEstabSelect();
+    toast(`${count} estabelecimentos importados!`);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function estabSelecionado() {
+  const v = document.getElementById('estabSelect').value;
+  if (v) document.getElementById('estabManual').value = v;
+}
+
+async function detectarLocal() {
+  setGpsStatus('info', 'Obtendo localização...');
+  if (!navigator.geolocation) { toast('GPS não disponível'); mostrarManualEstab(); return; }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude: lat, longitude: lon } = pos.coords;
+    setGpsStatus('info', 'Buscando estabelecimento...');
+    try {
+      let nome = await buscarOSM(lat, lon);
+      if (!nome) nome = await buscarGooglePlaces(lat, lon);
+      if (nome) mostrarConfirmEstab(nome, `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+      else { toast('Local não encontrado — informe manualmente'); mostrarManualEstab(); }
+    } catch { toast('Erro ao buscar — informe manualmente'); mostrarManualEstab(); }
+  }, () => { toast('GPS negado — informe manualmente'); mostrarManualEstab(); },
+  { timeout: 10000, enableHighAccuracy: true });
+}
+
+function setGpsStatus(type, msg) {
+  const el = document.getElementById('gpsStatus');
+  el.className = 'chip chip-' + type;
+  const icons = { info: 'ti-location', ok: 'ti-check', warn: 'ti-alert-triangle' };
+  el.innerHTML = `<i class="ti ${icons[type] || 'ti-location'}"></i> ${msg}`;
+}
+
+async function buscarOSM(lat, lon) {
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+      { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'PaoDuroApp/1.0' } }
+    );
+    const d = await r.json();
+    const nome = d.namedetails?.name || d.name || d.display_name?.split(',')[0];
+    return (nome && nome.length > 2) ? nome : null;
+  } catch { return null; }
+}
+
+async function buscarGooglePlaces(lat, lon) {
+  const key = localStorage.getItem('pd_gkey') || '';
+  if (!key) return null;
+  try {
+    const r = await fetch(
+      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&rankby=distance&type=store&key=${key}`
+    );
+    const d = await r.json();
+    return d.results?.[0]?.name || null;
+  } catch { return null; }
+}
+
+function mostrarConfirmEstab(nome, end) {
+  document.getElementById('estabNomeDetectado').textContent = nome;
+  document.getElementById('estabEndDetectado').textContent = end;
+  setGpsStatus('ok', 'Localização obtida');
+  show('confirmEstab');
+}
+
+function mostrarManualEstab() {
+  setGpsStatus('warn', 'Informe manualmente');
+  show('manualEstab');
+}
+
+function confirmarEstab(ok) {
+  if (ok) setEstab(document.getElementById('estabNomeDetectado').textContent, '');
+  else { hide('confirmEstab'); mostrarManualEstab(); }
+}
+
+function salvarEstabManual() {
+  const v = document.getElementById('estabManual').value.trim();
+  if (!v) { toast('Informe o nome'); return; }
+  if (!state.estabs.includes(v)) {
+    state.estabs.push(v);
+    localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
+    populateEstabSelect();
+  }
+  setEstab(v, '');
+}
+
+function setEstab(nome, cidade) {
+  state.estab = nome; state.cidade = cidade; save();
+  hide('confirmEstab'); hide('manualEstab');
+  document.getElementById('estabFinal').textContent = nome;
+  document.getElementById('estabCidadeFinal').textContent = cidade;
+  show('estabConfirmado');
+  setGpsStatus('ok', nome);
+  toast('Estabelecimento definido!');
+}
+
+function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
+
+async function processarCupom(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const preview = document.getElementById('cupomPreview');
+    preview.src = ev.target.result; preview.style.display = 'block';
+    show('cupomProcessando');
+    hide('cardItens'); hide('cardPagamento'); hide('cardExport');
+    const base64 = ev.target.result.split(',')[1];
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+              { type: 'text', text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Débito|Crédito","itens":[{"produto":"nome curto e legível do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como números decimais com ponto.' }
+            ]
+          }]
+        })
+      });
+      const data = await resp.json();
+      const txt = data.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(txt);
+      hide('cupomProcessando');
+      if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
+      if (parsed.pagamento) {
+        document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
+        show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
+      } else {
+        show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
+      }
+      if (parsed.itens?.length > 0) {
+        state.itens = parsed.itens.map(i => ({
+          produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0
+        }));
+        save(); renderItens();
+        show('cardItens'); show('cardExport'); atualizarTotais();
+      }
+      toast('Cupom processado com sucesso!');
+    } catch (err) {
+      hide('cupomProcessando');
+      toast('Erro ao processar — tente novamente');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function confirmarPgto(ok) {
+  if (ok) setPgto(document.getElementById('pgtoDetectado').textContent);
+  else { hide('confirmPgto'); show('manualPgto'); }
+}
+
+function salvarPgtoManual() {
+  const v = document.getElementById('pgtoSelect').value;
+  if (!v) { toast('Selecione a forma de pagamento'); return; }
+  setPgto(v);
+}
+
+function setPgto(v) {
+  state.pgto = v; save();
+  hide('confirmPgto'); hide('manualPgto');
+  document.getElementById('pgtoFinal').textContent = v;
+  show('pgtoConfirmado');
+}
+
+function trocarPgto() { hide('pgtoConfirmado'); show('manualPgto'); }
+
+function renderItens() {
+  document.getElementById('itensBody').innerHTML = state.itens.map((it, i) => `
+    <tr>
+      <td><input value="${it.produto.replace(/"/g,'&quot;')}" onchange="state.itens[${i}].produto=this.value;save();atualizarTotais()"></td>
+      <td><input value="${it.quantidade}" onchange="state.itens[${i}].quantidade=this.value;save()"></td>
+      <td><input type="number" value="${it.valor.toFixed(2)}" step="0.01" min="0" onchange="state.itens[${i}].valor=parseFloat(this.value)||0;save();atualizarTotais()"></td>
+      <td><button class="remove-btn" onclick="removerItem(${i})"><i class="ti ti-x"></i></button></td>
+    </tr>
+  `).join('');
+  document.getElementById('itemCount').textContent = state.itens.length;
+}
+
+function removerItem(i) { state.itens.splice(i, 1); save(); renderItens(); atualizarTotais(); }
+
+function addItemManual() {
+  state.itens.push({ produto: 'Novo item', quantidade: '1 UN', valor: 0 });
+  save(); renderItens(); atualizarTotais();
+}
+
+function atualizarTotais() {
+  const total = state.itens.reduce((s, i) => s + i.valor, 0);
+  document.getElementById('totalItens').textContent = state.itens.length;
+  document.getElementById('totalValor').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  document.getElementById('itemCount').textContent = state.itens.length;
+}
+
+function exportarCSV() {
+  if (!state.estab) { toast('Informe o estabelecimento'); return; }
+  if (!state.pgto) { toast('Informe a forma de pagamento'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
+  const rows = state.itens.map(it =>
+    `${hoje};${it.produto};${it.quantidade};${it.valor.toFixed(2).replace('.', ',')};${state.estab};${state.pgto}`
+  );
+  const csv = [header, ...rows].join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `pao_duro_${hoje.replace(/\//g, '-')}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('CSV exportado com sucesso!');
+}
+
+function novaCompra() {
+  if (state.itens.length > 0 && !confirm('Limpar a compra atual e começar nova?')) return;
+  state.estab = ''; state.cidade = ''; state.pgto = ''; state.itens = [];
+  save();
+  ['confirmEstab','manualEstab','estabConfirmado','confirmPgto','manualPgto',
+   'pgtoConfirmado','cardItens','cardPagamento','cardExport'].forEach(hide);
+  document.getElementById('cupomPreview').style.display = 'none';
+  document.getElementById('cupomInput').value = '';
+  setGpsStatus('info', 'Aguardando GPS...');
+  document.getElementById('itemCount').textContent = '0';
+  toast('Pronto para nova compra!');
+}
+
+function restoreUI() {
+  if (state.estab) setEstab(state.estab, state.cidade || '');
+  if (state.pgto) {
+    show('cardPagamento'); hide('confirmPgto'); hide('manualPgto');
+    document.getElementById('pgtoFinal').textContent = state.pgto;
+    show('pgtoConfirmado');
+  }
+  if (state.itens.length > 0) {
+    renderItens(); atualizarTotais();
+    show('cardItens'); show('cardExport');
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+load();
+</script>
+</body>
+</html>
