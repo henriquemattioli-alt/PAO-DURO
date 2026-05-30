@@ -12,35 +12,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
   <style>
     :root {
-      --green: #3B6D11;
-      --green-light: #EAF3DE;
-      --green-mid: #639922;
-      --amber: #BA7517;
-      --amber-light: #FAEEDA;
-      --red-light: #FCEBEB;
-      --red: #A32D2D;
-      --bg: #ffffff;
-      --bg2: #f5f5f5;
-      --bg3: #ebebeb;
-      --border: #e0e0e0;
-      --text: #1a1a1a;
-      --text2: #555;
-      --text3: #888;
-      --radius: 10px;
-      --radius-sm: 6px;
+      --green: #3B6D11; --green-light: #EAF3DE; --green-mid: #639922;
+      --amber: #BA7517; --amber-light: #FAEEDA;
+      --red-light: #FCEBEB; --red: #A32D2D;
+      --bg: #ffffff; --bg2: #f5f5f5; --bg3: #ebebeb;
+      --border: #e0e0e0; --text: #1a1a1a; --text2: #555; --text3: #888;
+      --radius: 10px; --radius-sm: 6px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #111;
-        --bg2: #1e1e1e;
-        --bg3: #2a2a2a;
-        --border: #333;
-        --text: #f0f0f0;
-        --text2: #aaa;
-        --text3: #666;
-        --green-light: #1a2e0a;
-        --amber-light: #2e1e00;
-        --red-light: #2e0a0a;
+        --bg: #111; --bg2: #1e1e1e; --bg3: #2a2a2a; --border: #333;
+        --text: #f0f0f0; --text2: #aaa; --text3: #666;
+        --green-light: #1a2e0a; --amber-light: #2e1e00; --red-light: #2e0a0a;
       }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -98,8 +81,7 @@
     .ml-auto { margin-left: auto; }
   </style>
 </head>
-
-  <body>
+<body>
 <div class="app">
   <div class="header">
     <div class="logo"><i class="ti ti-receipt"></i></div>
@@ -107,9 +89,37 @@
       <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span></div>
       <div class="hsub">Leitor de cupom fiscal</div>
     </div>
+    <button class="btn btn-gray btn-sm" style="width:auto" onclick="configurarChave()" title="Chave Gemini">
+      <i class="ti ti-key"></i>
+    </button>
+    </div>
+    <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
+      <i class="ti ti-key"></i>
+    </button>
+    </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto" onclick="novaCompra()">
       <i class="ti ti-refresh"></i> Nova
     </button>
+  </div>
+
+  <div class="card hidden" id="cardChave">
+    <div class="card-title"><i class="ti ti-key"></i> Chave API Google Gemini</div>
+    <div class="field">
+      <label>Cole sua chave (começa com AIza...)</label>
+      <input type="text" id="inputChave" placeholder="AIza...">
+    </div>
+    <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar chave</button>
+    <div class="import-note" style="margin-top:8px">Obtenha sua chave gratuita em aistudio.google.com</div>
+  </div>
+
+  <div class="card hidden" id="cardChave">
+    <div class="card-title"><i class="ti ti-key"></i> Chave API Google Gemini</div>
+    <div class="field">
+      <label>Cole sua chave (comeca com AIza...)</label>
+      <input type="text" id="inputChave" placeholder="AIza...">
+    </div>
+    <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar chave</button>
+    <div class="import-note" style="margin-top:8px">Chave gratuita em aistudio.google.com</div>
   </div>
 
   <div class="card">
@@ -126,7 +136,7 @@
       <div style="font-size:12px;color:var(--text3);margin-top:2px" id="estabEndDetectado"></div>
       <div class="confirm-btns">
         <div class="btn-yes" onclick="confirmarEstab(true)"><i class="ti ti-check"></i> Sim</div>
-        <div class="btn-no" onclick="confirmarEstab(false)"><i class="ti ti-x"></i> Não</div>
+        <div class="btn-no" onclick="confirmarEstab(false)"><i class="ti ti-x"></i> Nao</div>
       </div>
     </div>
     <div id="manualEstab" class="hidden" style="margin-top:8px">
@@ -146,7 +156,7 @@
       <div class="row-flex" style="margin-top:4px">
         <input type="file" accept=".csv,.txt" id="csvEstabInput" class="hidden" onchange="importarEstabs(event)">
         <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvEstabInput').click()">
-          <i class="ti ti-upload"></i> Importar CSV do Pão Duro
+          <i class="ti ti-upload"></i> Importar CSV do Pao Duro
         </button>
       </div>
       <div class="import-note">CSV com um estabelecimento por linha. Usa a primeira coluna.</div>
@@ -160,6 +170,16 @@
         <i class="ti ti-edit"></i> Trocar
       </button>
     </div>
+  </div>
+
+  <div class="card hidden" id="cardChave">
+    <div class="card-title"><i class="ti ti-key"></i> Chave API Google Gemini</div>
+    <div class="field">
+      <label>Cole sua chave (começa com AIza...)</label>
+      <input type="text" id="inputChave" placeholder="AIza...">
+    </div>
+    <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar chave</button>
+    <div class="import-note" style="margin-top:8px">Obtenha sua chave gratuita em aistudio.google.com</div>
   </div>
 
   <div class="card">
@@ -181,7 +201,7 @@
       <div class="confirm-value" id="pgtoDetectado"></div>
       <div class="confirm-btns">
         <div class="btn-yes" onclick="confirmarPgto(true)"><i class="ti ti-check"></i> Sim</div>
-        <div class="btn-no" onclick="confirmarPgto(false)"><i class="ti ti-x"></i> Não</div>
+        <div class="btn-no" onclick="confirmarPgto(false)"><i class="ti ti-x"></i> Nao</div>
       </div>
     </div>
     <div id="manualPgto" class="hidden" style="margin-top:8px">
@@ -191,8 +211,8 @@
           <option value="">Selecione...</option>
           <option>Dinheiro</option>
           <option>Pix</option>
-          <option>Débito</option>
-          <option>Crédito</option>
+          <option>Debito</option>
+          <option>Credito</option>
         </select>
       </div>
       <button class="btn btn-green btn-sm" style="margin-top:6px" onclick="salvarPgtoManual()">
@@ -208,7 +228,7 @@
   </div>
 
   <div class="card hidden" id="cardItens">
-    <div class="card-title"><i class="ti ti-list"></i> Itens — edite os nomes se necessário</div>
+    <div class="card-title"><i class="ti ti-list"></i> Itens - edite os nomes se necessario</div>
     <table class="items-table">
       <thead><tr>
         <th style="width:48%">Produto</th>
@@ -236,7 +256,7 @@
       </div>
     </div>
     <button class="btn btn-green" onclick="exportarCSV()">
-      <i class="ti ti-download"></i> Exportar CSV para o Pão Duro
+      <i class="ti ti-download"></i> Exportar CSV para o Pao Duro
     </button>
     <button class="btn btn-danger" style="margin-top:8px" onclick="novaCompra()">
       <i class="ti ti-trash"></i> Limpar e nova compra
@@ -244,6 +264,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
 <script>
 let state = {
   estab: '', cidade: '', pgto: '', itens: [],
@@ -259,11 +280,12 @@ function load() {
   restoreUI();
 }
 
-function toast(msg, dur = 2500) {
+function toast(msg, dur) {
+  dur = dur || 2500;
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.display = 'block';
   clearTimeout(t._t);
-  t._t = setTimeout(() => t.style.display = 'none', dur);
+  t._t = setTimeout(function() { t.style.display = 'none'; }, dur);
 }
 function show(id) { document.getElementById(id).classList.remove('hidden'); }
 function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -271,7 +293,7 @@ function hide(id) { document.getElementById(id).classList.add('hidden'); }
 function populateEstabSelect() {
   const sel = document.getElementById('estabSelect');
   sel.innerHTML = '<option value="">Selecione ou digite abaixo...</option>';
-  state.estabs.forEach(e => {
+  state.estabs.forEach(function(e) {
     const o = document.createElement('option');
     o.value = o.textContent = e;
     sel.appendChild(o);
@@ -281,16 +303,16 @@ function populateEstabSelect() {
 function importarEstabs(e) {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
-    const lines = ev.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+  reader.onload = function(ev) {
+    const lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
     let count = 0;
-    lines.forEach(l => {
+    lines.forEach(function(l) {
       const nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
       if (nome && !state.estabs.includes(nome)) { state.estabs.push(nome); count++; }
     });
     localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
     populateEstabSelect();
-    toast(`${count} estabelecimentos importados!`);
+    toast(count + ' estabelecimentos importados!');
   };
   reader.readAsText(file, 'UTF-8');
 }
@@ -300,19 +322,24 @@ function estabSelecionado() {
   if (v) document.getElementById('estabManual').value = v;
 }
 
-async function detectarLocal() {
-  setGpsStatus('info', 'Obtendo localização...');
-  if (!navigator.geolocation) { toast('GPS não disponível'); mostrarManualEstab(); return; }
-  navigator.geolocation.getCurrentPosition(async pos => {
-    const { latitude: lat, longitude: lon } = pos.coords;
+function detectarLocal() {
+  setGpsStatus('info', 'Obtendo localizacao...');
+  if (!navigator.geolocation) { toast('GPS nao disponivel'); mostrarManualEstab(); return; }
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
     setGpsStatus('info', 'Buscando estabelecimento...');
-    try {
-      let nome = await buscarOSM(lat, lon);
-      if (!nome) nome = await buscarGooglePlaces(lat, lon);
-      if (nome) mostrarConfirmEstab(nome, `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-      else { toast('Local não encontrado — informe manualmente'); mostrarManualEstab(); }
-    } catch { toast('Erro ao buscar — informe manualmente'); mostrarManualEstab(); }
-  }, () => { toast('GPS negado — informe manualmente'); mostrarManualEstab(); },
+    buscarOSM(lat, lon).then(function(nome) {
+      if (nome) {
+        mostrarConfirmEstab(nome, lat.toFixed(4) + ', ' + lon.toFixed(4));
+      } else {
+        return buscarGooglePlaces(lat, lon).then(function(nomeG) {
+          if (nomeG) mostrarConfirmEstab(nomeG, '');
+          else { toast('Local nao encontrado - informe manualmente'); mostrarManualEstab(); }
+        });
+      }
+    }).catch(function() { toast('Erro ao buscar - informe manualmente'); mostrarManualEstab(); });
+  }, function() { toast('GPS negado - informe manualmente'); mostrarManualEstab(); },
   { timeout: 10000, enableHighAccuracy: true });
 }
 
@@ -320,37 +347,33 @@ function setGpsStatus(type, msg) {
   const el = document.getElementById('gpsStatus');
   el.className = 'chip chip-' + type;
   const icons = { info: 'ti-location', ok: 'ti-check', warn: 'ti-alert-triangle' };
-  el.innerHTML = `<i class="ti ${icons[type] || 'ti-location'}"></i> ${msg}`;
+  el.innerHTML = '<i class="ti ' + (icons[type] || 'ti-location') + '"></i> ' + msg;
 }
 
-async function buscarOSM(lat, lon) {
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
-      { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'PaoDuroApp/1.0' } }
-    );
-    const d = await r.json();
-    const nome = d.namedetails?.name || d.name || d.display_name?.split(',')[0];
+function buscarOSM(lat, lon) {
+  return fetch(
+    'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&addressdetails=1',
+    { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'PaoDuroApp/1.0' } }
+  ).then(function(r) { return r.json(); }).then(function(d) {
+    const nome = (d.namedetails && d.namedetails.name) || d.name || (d.display_name && d.display_name.split(',')[0]);
     return (nome && nome.length > 2) ? nome : null;
-  } catch { return null; }
+  }).catch(function() { return null; });
 }
 
-async function buscarGooglePlaces(lat, lon) {
+function buscarGooglePlaces(lat, lon) {
   const key = localStorage.getItem('pd_gkey') || '';
-  if (!key) return null;
-  try {
-    const r = await fetch(
-      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&rankby=distance&type=store&key=${key}`
-    );
-    const d = await r.json();
-    return d.results?.[0]?.name || null;
-  } catch { return null; }
+  if (!key) return Promise.resolve(null);
+  return fetch(
+    'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=' + lat + ',' + lon + '&rankby=distance&type=store&key=' + key
+  ).then(function(r) { return r.json(); }).then(function(d) {
+    return (d.results && d.results.length > 0) ? d.results[0].name : null;
+  }).catch(function() { return null; });
 }
 
 function mostrarConfirmEstab(nome, end) {
   document.getElementById('estabNomeDetectado').textContent = nome;
   document.getElementById('estabEndDetectado').textContent = end;
-  setGpsStatus('ok', 'Localização obtida');
+  setGpsStatus('ok', 'Localizacao obtida');
   show('confirmEstab');
 }
 
@@ -387,33 +410,39 @@ function setEstab(nome, cidade) {
 
 function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
 
-async function processarCupom(e) {
+function processarCupom(e) {
   const file = e.target.files[0]; if (!file) return;
+
+  let geminiKey = localStorage.getItem('pd_gemini_key') || '';
+  if (!geminiKey) {
+    toast('Configure a chave Gemini primeiro! Toque no icone de chave.');
+    show('cardChave');
+    document.getElementById('inputChave').focus();
+    return;
+  }
+
   const reader = new FileReader();
-  reader.onload = async ev => {
+  reader.onload = function(ev) {
     const preview = document.getElementById('cupomPreview');
     preview.src = ev.target.result; preview.style.display = 'block';
     show('cupomProcessando');
     hide('cardItens'); hide('cardPagamento'); hide('cardExport');
     const base64 = ev.target.result.split(',')[1];
-    try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-              { type: 'text', text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Débito|Crédito","itens":[{"produto":"nome curto e legível do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como números decimais com ponto.' }
-            ]
-          }]
-        })
-      });
-      const data = await resp.json();
-      const txt = data.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim();
+
+    fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + geminiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+            { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto e legivel do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como numeros decimais com ponto.' }
+          ]
+        }],
+        generationConfig: { temperature: 0.1 }
+      })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      const txt = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(txt);
       hide('cupomProcessando');
       if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
@@ -423,18 +452,19 @@ async function processarCupom(e) {
       } else {
         show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
       }
-      if (parsed.itens?.length > 0) {
-        state.itens = parsed.itens.map(i => ({
-          produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0
-        }));
+      if (parsed.itens && parsed.itens.length > 0) {
+        state.itens = parsed.itens.map(function(i) {
+          return { produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0 };
+        });
         save(); renderItens();
         show('cardItens'); show('cardExport'); atualizarTotais();
       }
       toast('Cupom processado com sucesso!');
-    } catch (err) {
+    }).catch(function(err) {
       hide('cupomProcessando');
-      toast('Erro ao processar — tente novamente');
-    }
+      localStorage.removeItem('pd_gemini_key');
+      toast('Erro ao processar - verifique a chave e tente novamente');
+    });
   };
   reader.readAsDataURL(file);
 }
@@ -460,14 +490,14 @@ function setPgto(v) {
 function trocarPgto() { hide('pgtoConfirmado'); show('manualPgto'); }
 
 function renderItens() {
-  document.getElementById('itensBody').innerHTML = state.itens.map((it, i) => `
-    <tr>
-      <td><input value="${it.produto.replace(/"/g,'&quot;')}" onchange="state.itens[${i}].produto=this.value;save();atualizarTotais()"></td>
-      <td><input value="${it.quantidade}" onchange="state.itens[${i}].quantidade=this.value;save()"></td>
-      <td><input type="number" value="${it.valor.toFixed(2)}" step="0.01" min="0" onchange="state.itens[${i}].valor=parseFloat(this.value)||0;save();atualizarTotais()"></td>
-      <td><button class="remove-btn" onclick="removerItem(${i})"><i class="ti ti-x"></i></button></td>
-    </tr>
-  `).join('');
+  document.getElementById('itensBody').innerHTML = state.itens.map(function(it, i) {
+    return '<tr>' +
+      '<td><input value="' + it.produto.replace(/"/g,'&quot;') + '" onchange="state.itens[' + i + '].produto=this.value;save();atualizarTotais()"></td>' +
+      '<td><input value="' + it.quantidade + '" onchange="state.itens[' + i + '].quantidade=this.value;save()"></td>' +
+      '<td><input type="number" value="' + it.valor.toFixed(2) + '" step="0.01" min="0" onchange="state.itens[' + i + '].valor=parseFloat(this.value)||0;save();atualizarTotais()"></td>' +
+      '<td><button class="remove-btn" onclick="removerItem(' + i + ')"><i class="ti ti-x"></i></button></td>' +
+      '</tr>';
+  }).join('');
   document.getElementById('itemCount').textContent = state.itens.length;
 }
 
@@ -479,7 +509,7 @@ function addItemManual() {
 }
 
 function atualizarTotais() {
-  const total = state.itens.reduce((s, i) => s + i.valor, 0);
+  const total = state.itens.reduce(function(s, i) { return s + i.valor; }, 0);
   document.getElementById('totalItens').textContent = state.itens.length;
   document.getElementById('totalValor').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
   document.getElementById('itemCount').textContent = state.itens.length;
@@ -491,21 +521,21 @@ function exportarCSV() {
   if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
   const hoje = new Date().toLocaleDateString('pt-BR');
   const header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
-  const rows = state.itens.map(it =>
-    `${hoje};${it.produto};${it.quantidade};${it.valor.toFixed(2).replace('.', ',')};${state.estab};${state.pgto}`
-  );
-  const csv = [header, ...rows].join('\r\n');
+  const rows = state.itens.map(function(it) {
+    return hoje + ';' + it.produto + ';' + it.quantidade + ';' + it.valor.toFixed(2).replace('.', ',') + ';' + state.estab + ';' + state.pgto;
+  });
+  const csv = [header].concat(rows).join('\r\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `pao_duro_${hoje.replace(/\//g, '-')}.csv`;
+  a.href = url; a.download = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
   toast('CSV exportado com sucesso!');
 }
 
 function novaCompra() {
-  if (state.itens.length > 0 && !confirm('Limpar a compra atual e começar nova?')) return;
+  if (state.itens.length > 0 && !confirm('Limpar a compra atual e comecar nova?')) return;
   state.estab = ''; state.cidade = ''; state.pgto = ''; state.itens = [];
   save();
   ['confirmEstab','manualEstab','estabConfirmado','confirmPgto','manualPgto',
@@ -530,9 +560,23 @@ function restoreUI() {
   }
 }
 
+function configurarChave() {
+  const atual = localStorage.getItem('pd_gemini_key') || '';
+  show('cardChave');
+  document.getElementById('inputChave').value = atual;
+}
+
+function salvarChave() {
+  const v = document.getElementById('inputChave').value.trim();
+  if (!v) { toast('Cole a chave do Gemini'); return; }
+  localStorage.setItem('pd_gemini_key', v);
+  hide('cardChave');
+  toast('Chave salva! Agora pode fotografar o cupom.');
+}
+
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').catch(function() {});
   });
 }
 
