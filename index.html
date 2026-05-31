@@ -122,6 +122,16 @@
     <div class="import-note" style="margin-top:8px">Chave gratuita em aistudio.google.com</div>
   </div>
 
+  <div class="card hidden" id="cardDrive">
+    <div class="card-title"><i class="ti ti-brand-google-drive"></i> Configurar Google Drive</div>
+    <div class="field">
+      <label>Cole seu Google OAuth Client ID</label>
+      <input type="text" id="inputDriveClient" placeholder="xxxx.apps.googleusercontent.com">
+    </div>
+    <button class="btn btn-green" onclick="salvarClientId()"><i class="ti ti-check"></i> Salvar</button>
+    <div class="import-note" style="margin-top:8px">Crie em console.cloud.google.com → APIs → Credenciais → OAuth 2.0</div>
+  </div>
+
   <div class="card">
     <div class="card-title"><i class="ti ti-map-pin"></i> Estabelecimento</div>
     <div id="gpsStatus" class="chip chip-info" style="margin-bottom:8px">
@@ -256,7 +266,10 @@
       </div>
     </div>
     <button class="btn btn-green" onclick="exportarCSV()">
-      <i class="ti ti-download"></i> Exportar CSV para o Pao Duro
+      <i class="ti ti-download"></i> Baixar CSV no celular
+    </button>
+    <button class="btn btn-gray" style="margin-top:8px" onclick="exportarDrive()">
+      <i class="ti ti-brand-google-drive"></i> Salvar no Google Drive
     </button>
     <button class="btn btn-danger" style="margin-top:8px" onclick="novaCompra()">
       <i class="ti ti-trash"></i> Limpar e nova compra
@@ -303,10 +316,8 @@ function populateEstabSelect() {
 function importarEstabs(e) {
   const file = e.target.files[0]; if (!file) return;
   console.log('processarCupom iniciado, chave:', geminiKey ? 'OK' : 'VAZIA');
-  alert('Iniciando processamento...');
   const reader = new FileReader();
   reader.onload = function(ev) {
-    alert('Foto lida, enviando para Gemini...');
     const lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
     let count = 0;
     lines.forEach(function(l) {
@@ -591,6 +602,94 @@ function salvarChave() {
   localStorage.setItem('pd_gemini_key', v);
   hide('cardChave');
   toast('Chave salva! Agora pode fotografar o cupom.');
+}
+
+function exportarDrive() {
+  if (!state.estab) { toast('Informe o estabelecimento'); return; }
+  if (!state.pgto) { toast('Informe a forma de pagamento'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
+  const rows = state.itens.map(function(it) {
+    return hoje + ';' + it.produto + ';' + it.quantidade + ';' + it.valor.toFixed(2).replace('.', ',') + ';' + state.estab + ';' + state.pgto;
+  });
+  const csv = [header].concat(rows).join('\r\n');
+  const filename = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
+
+  // Autenticar com Google e salvar no Drive
+  const clientId = localStorage.getItem('pd_drive_client') || '';
+  if (!clientId) {
+    show('cardDrive');
+    return;
+  }
+  salvarNoDrive(csv, filename, clientId);
+}
+
+function salvarNoDrive(csv, filename, clientId) {
+  // Usar Google Identity Services para autenticação
+  const token = localStorage.getItem('pd_drive_token') || '';
+  if (!token) {
+    autenticarDrive(csv, filename, clientId);
+    return;
+  }
+  enviarParaDrive(csv, filename, token);
+}
+
+function autenticarDrive(csv, filename, clientId) {
+  const script = document.createElement('script');
+  script.src = 'https://accounts.google.com/gsi/client';
+  script.onload = function() {
+    google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: function(resp) {
+        if (resp.access_token) {
+          localStorage.setItem('pd_drive_token', resp.access_token);
+          enviarParaDrive(csv, filename, resp.access_token);
+        }
+      }
+    }).requestAccessToken();
+  };
+  document.head.appendChild(script);
+}
+
+function enviarParaDrive(csv, filename, token) {
+  toast('Salvando no Google Drive...');
+  const boundary = 'paoduro_boundary';
+  const metadata = JSON.stringify({ name: filename, mimeType: 'text/csv', parents: [] });
+  const body = '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' +
+    metadata + '\r\n--' + boundary + '\r\nContent-Type: text/csv\r\n\r\n' +
+    '\uFEFF' + csv + '\r\n--' + boundary + '--';
+
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'multipart/related; boundary=' + boundary
+    },
+    body: body
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.id) {
+      toast('Salvo no Google Drive: ' + filename);
+    } else if (data.error && data.error.code === 401) {
+      localStorage.removeItem('pd_drive_token');
+      toast('Sessao expirada - tente novamente');
+    } else {
+      toast('Erro ao salvar no Drive');
+    }
+  }).catch(function() {
+    localStorage.removeItem('pd_drive_token');
+    toast('Erro ao salvar no Drive - tente novamente');
+  });
+}
+
+function salvarClientId() {
+  const v = document.getElementById('inputDriveClient').value.trim();
+  if (!v) { toast('Cole o Client ID'); return; }
+  localStorage.setItem('pd_drive_client', v);
+  hide('cardDrive');
+  toast('Client ID salvo! Tente exportar novamente.');
 }
 
 if ('serviceWorker' in navigator) {
