@@ -21,10 +21,42 @@
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #111; --bg2: #1e1e1e; --bg3: #2a2a2a; --border: #333;
-        --text: #f0f0f0; --text2: #aaa; --text3: #666;
-        --green-light: #1a2e0a; --amber-light: #2e1e00; --red-light: #2e0a0a;
+        --bg: #1a1a1a; --bg2: #252525; --bg3: #2e2e2e; --border: #3a3a3a;
+        --text: #f0f0f0; --text2: #c0c0c0; --text3: #888;
+        --green: #7DC454; --green-light: #2a3d1a; --green-mid: #5a9a30;
+        --amber-light: #3a2800; --red-light: #3a1010; --red: #E06060;
       }
+      .btn-green {
+        background: linear-gradient(180deg, #4a7a28 0%, #2e5018 100%);
+        color: #c8f090; border-color: #5a9a30;
+      }
+      .btn-gray {
+        background: linear-gradient(180deg, #484848 0%, #303030 100%);
+        color: #e8e8e8; border-color: #606060;
+      }
+      .btn-danger {
+        background: linear-gradient(180deg, #6a2020 0%, #4a1414 100%);
+        color: #f0a0a0; border-color: #904040;
+      }
+      .btn-yes {
+        background: linear-gradient(180deg, #4a7a28 0%, #2e5018 100%) !important;
+        color: #c8f090 !important; border-color: #5a9a30 !important;
+      }
+      .btn-no {
+        background: linear-gradient(180deg, #6a2020 0%, #4a1414 100%) !important;
+        color: #f0a0a0 !important; border-color: #904040 !important;
+      }
+      .card { background: #222; border-color: #3a3a3a; }
+      .card-title { color: #a0a0a0; }
+      .chip-ok { background: #2a3d1a; color: #7DC454; }
+      .chip-info { background: #1a2a3d; color: #60a0e0; }
+      .chip-warn { background: #3a2800; color: #e0a040; }
+      .counter { background: #2a3d1a; color: #7DC454; }
+      .logo { background: #2a3d1a; }
+      .confirm-box { background: #2a2a2a; border-color: #444; }
+      .total-box { background: #252525; }
+      input, select { background: #2a2a2a; border-color: #444; color: #f0f0f0; }
+      .remove-btn { color: #888; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
