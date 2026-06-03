@@ -504,7 +504,7 @@ function processarCupom(e) {
           contents: [{
             parts: [
               { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-              { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens comprados. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome do mercado/loja","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto e legivel do produto","quantidade":"ex: 1 UN ou 2 KG ou 500 ML","valor":4.50}]}. Valores como numeros decimais com ponto.' }
+              { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens. REGRAS: 1) Se uma linha tiver valor NEGATIVO, é desconto — subtraia do item anterior e registre o valor final positivo. 2) Se o valor for POSITIVO, é o preco final — use diretamente. 3) Nunca registre valores negativos no JSON. 4) Ignore descontos gerais no total da compra. 5) Nome curto e legivel, sem codigos de barras. 6) Valor final = o que o consumidor efetivamente pagou. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto","quantidade":"1 UN ou 0.746 KG","valor":4.50}]}. Valores decimais com ponto.' }
             ]
           }],
           generationConfig: { temperature: 0.1 }
