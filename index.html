@@ -357,12 +357,15 @@ function importarEstabs(e) {
   reader.onload = function(ev) {
     var lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
     var count = 0;
-    lines.forEach(function(l) {
+    lines.forEach(function(l, idx) {
       var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
+      // Ignora cabeçalho (primeira linha se for texto sem números)
+      if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
       if (nome && !state.estabs.includes(nome)) { state.estabs.push(nome); count++; }
     });
     localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
     populateEstabSelect();
+    show('manualEstab');
     toast(count + ' estabelecimentos importados!');
   };
   reader.readAsText(file, 'UTF-8');
