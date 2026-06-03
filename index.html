@@ -141,6 +141,9 @@
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
       <i class="ti ti-key"></i>
     </button>
+    <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar Google Drive">
+      <i class="ti ti-brand-google-drive"></i>
+    </button>
     <button class="btn btn-gray btn-sm" style="width:auto" onclick="novaCompra()">
       <i class="ti ti-refresh"></i> Nova
     </button>
@@ -757,6 +760,13 @@ function configurarChave() {
   show('cardChave');
   document.getElementById('inputChave').value = atual;
   document.getElementById('inputChave').focus();
+}
+
+function configurarDrive() {
+  var atual = localStorage.getItem('pd_drive_client') || '';
+  document.getElementById('inputDriveClient').value = atual;
+  show('cardDrive');
+  document.getElementById('inputDriveClient').focus();
 }
 
 function salvarChave() {
