@@ -138,8 +138,8 @@
       <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span></div>
       <div class="hsub">Leitor de cupom fiscal</div>
     </div>
-    <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
-      <i class="ti ti-key"></i>
+    <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar pCloud">
+      <i class="ti ti-cloud"></i>
     </button>
     <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar Google Drive">
       <i class="ti ti-brand-google-drive"></i>
@@ -149,15 +149,15 @@
     </button>
   </div>
 
-  <!-- CARD: CHAVE GEMINI (único) -->
+  <!-- CARD: PCLOUD -->
   <div class="card hidden" id="cardChave">
-    <div class="card-title"><i class="ti ti-key"></i> Chave API Google Gemini</div>
+    <div class="card-title"><i class="ti ti-cloud"></i> Configurar pCloud</div>
     <div class="field">
-      <label>Cole sua chave (começa com AIza...)</label>
-      <input type="text" id="inputChave" placeholder="AIza...">
+      <label>Token de acesso pCloud</label>
+      <input type="text" id="inputChave" placeholder="Cole seu token aqui...">
     </div>
-    <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar chave</button>
-    <div class="import-note" style="margin-top:8px">Chave gratuita em aistudio.google.com</div>
+    <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar token</button>
+    <div class="import-note" style="margin-top:8px">Gere em my.pcloud.com → pCloud for Devs → My Apps</div>
   </div>
 
   <!-- CARD: GOOGLE DRIVE -->
@@ -224,7 +224,7 @@
 
   <!-- CARD: CUPOM FISCAL -->
   <div class="card">
-    <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
+    <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal <span style="font-size:10px;color:var(--text3);font-weight:400">(OCR local)</span></div>
     <button class="btn btn-green" onclick="document.getElementById('cupomInput').click()">
       <i class="ti ti-camera"></i> Fotografar cupom fiscal
     </button>
@@ -466,13 +466,7 @@ function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('ma
 // ─── CUPOM / GEMINI ───────────────────────────────────────────────────────────
 function processarCupom(e) {
   var file = e.target.files[0]; if (!file) return;
-  var geminiKey = localStorage.getItem('pd_gemini_key') || '';
-  if (!geminiKey) {
-    toast('Configure a chave Gemini primeiro! Toque no ícone de chave.');
-    show('cardChave');
-    document.getElementById('inputChave').focus();
-    return;
-  }
+
   var reader = new FileReader();
   reader.onload = function(ev) {
     var preview = document.getElementById('cupomPreview');
@@ -480,59 +474,168 @@ function processarCupom(e) {
     show('cupomProcessando');
     hide('cardItens'); hide('cardPagamento'); hide('cardExport');
 
+    // Pré-processa imagem para melhor OCR
     var img = new Image();
     img.onload = function() {
       var canvas = document.createElement('canvas');
-      var maxW = 1024;
-      var scale = img.width > maxW ? maxW / img.width : 1;
+      // Escala para largura ideal de OCR
+      var targetW = 1200;
+      var scale = img.width < targetW ? targetW / img.width : 1;
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      var base64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + geminiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-              { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens. REGRAS: 1) Se uma linha tiver valor NEGATIVO, é desconto — subtraia do item anterior e registre o valor final positivo. 2) Se o valor for POSITIVO, é o preço final — use diretamente. 3) Nunca registre valores negativos no JSON. 4) Ignore descontos gerais no total da compra. 5) Nome curto e legível, sem códigos de barras. 6) Valor final = o que o consumidor efetivamente pagou. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto","quantidade":"1 UN ou 0.746 KG","valor":4.50}]}. Valores decimais com ponto.' }
-            ]
-          }],
-          generationConfig: { temperature: 0.1 }
-        })
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        hide('cupomProcessando');
-        if (!data.candidates || !data.candidates[0]) {
-          alert('Erro Gemini: ' + JSON.stringify(data)); return;
-        }
-        var txt = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        var parsed = JSON.parse(txt);
-        if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
-        if (parsed.pagamento) {
-          document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
-          show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
-        } else {
-          show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
-        }
-        if (parsed.itens && parsed.itens.length > 0) {
-          state.itens = parsed.itens.map(function(i) {
-            return { produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0 };
-          });
-          save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
-        }
-        toast('Cupom processado com sucesso!');
-      }).catch(function(err) {
-        hide('cupomProcessando');
-        alert('ERRO: ' + err.message);
-        toast('Erro ao processar — tente novamente');
-      });
+      // Converte para escala de cinza e aumenta contraste
+      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var data = imageData.data;
+      for (var i = 0; i < data.length; i += 4) {
+        var gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+        // Binarização simples — limiar 128
+        var val = gray > 128 ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = val;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      // Carrega Tesseract.js via CDN
+      if (!window.Tesseract) {
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = function() { rodarOCR(canvas); };
+        script.onerror = function() {
+          hide('cupomProcessando');
+          toast('Erro ao carregar OCR. Verifique sua conexão.');
+        };
+        document.head.appendChild(script);
+      } else {
+        rodarOCR(canvas);
+      }
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
+
+function rodarOCR(canvas) {
+  document.querySelector('#cupomProcessando').innerHTML =
+    '<span class="spinner"></span> Lendo cupom (OCR local)...';
+
+  Tesseract.recognize(canvas, 'por', {
+    logger: function(m) {
+      if (m.status === 'recognizing text') {
+        var pct = Math.round(m.progress * 100);
+        document.querySelector('#cupomProcessando').innerHTML =
+          '<span class="spinner"></span> Lendo cupom... ' + pct + '%';
+      }
+    }
+  }).then(function(result) {
+    hide('cupomProcessando');
+    var texto = result.data.text;
+    console.log('OCR texto bruto:', texto);
+    var parsed = parsearCupom(texto);
+    console.log('Parsed:', parsed);
+    aplicarResultado(parsed);
+  }).catch(function(err) {
+    hide('cupomProcessando');
+    alert('Erro OCR: ' + err.message);
+  });
+}
+
+function parsearCupom(texto) {
+  var linhas = texto.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 2; });
+  var itens = [];
+  var pagamento = '';
+  var estabelecimento = '';
+
+  // Detecta estabelecimento (primeiras linhas não numéricas)
+  for (var i = 0; i < Math.min(5, linhas.length); i++) {
+    if (!/\d{2}[/.]\d{2}/.test(linhas[i]) && !/CNPJ/i.test(linhas[i]) && linhas[i].length > 3) {
+      if (!estabelecimento) estabelecimento = linhas[i];
+    }
+  }
+
+  // Detecta forma de pagamento
+  var txtLower = texto.toLowerCase();
+  if (/pix/i.test(txtLower))                          pagamento = 'Pix';
+  else if (/credito|crédito/i.test(txtLower))         pagamento = 'Credito';
+  else if (/debito|débito/i.test(txtLower))           pagamento = 'Debito';
+  else if (/dinheiro|espécie|especie/i.test(txtLower))pagamento = 'Dinheiro';
+
+  // Parser de itens — padrões comuns de cupom fiscal brasileiro
+  // Padrão 1: "PRODUTO   QTD UN  x  PRECO    TOTAL"
+  // Padrão 2: "PRODUTO                          TOTAL"
+  var reItem1 = /^(.+?)\s+(\d+[.,]\d+)\s*(?:UN|KG|LT|PC|CX|GR|G|L)\s+(?:x|X|\*)\s*\d+[.,]\d+\s+(\d+[.,]\d+)/i;
+  var reItem2 = /^(.{3,40}?)\s{2,}(\d+[.,]\d{2})\s*$/;
+  var reItem3 = /^(\d+)\s+(.+?)\s+(\d+[.,]\d+)\s*(?:UN|KG|LT|PC|CX)?\s+(\d+[.,]\d{2})/i;
+  var reDesconto = /desconto|acrescimo|troco|total|subtotal|dinheiro|pix|credito|debito|cupom|nfc|sat|cnpj|cpf|data|hora|caixa|operador|obrigado/i;
+
+  linhas.forEach(function(linha) {
+    if (reDesconto.test(linha)) return;
+    if (linha.length < 5) return;
+
+    var m;
+
+    // Padrão 3: "QTD PRODUTO ... VALOR"
+    m = linha.match(/^(\d+)\s+(.{3,}?)\s+(\d+[.,]\d{2})$/);
+    if (m) {
+      var qtd = m[1];
+      var nome = m[2].trim();
+      var valor = parseFloat(m[3].replace(',', '.'));
+      if (valor > 0 && valor < 9999 && nome.length > 2) {
+        itens.push({ produto: capitalizar(nome), quantidade: qtd + ' UN', valor: valor });
+        return;
+      }
+    }
+
+    // Padrão 1: com unidade e multiplicação
+    m = linha.match(/^(.+?)\s+(\d+[.,]\d+)\s*(UN|KG|LT|PC|CX|GR|G|L)\s*[xX\*]\s*\d+[.,]\d+\s+(\d+[.,]\d{2})/i);
+    if (m) {
+      var nome = m[1].trim();
+      var qtd = m[2].replace(',', '.') + ' ' + m[3].toUpperCase();
+      var valor = parseFloat(m[4].replace(',', '.'));
+      if (valor > 0 && valor < 9999 && nome.length > 2) {
+        itens.push({ produto: capitalizar(nome), quantidade: qtd, valor: valor });
+        return;
+      }
+    }
+
+    // Padrão 2: nome + valor no final
+    m = linha.match(/^([A-Za-zÀ-ÿ0-9 ]{3,35}?)\s{2,}(\d+[.,]\d{2})$/);
+    if (m) {
+      var nome = m[1].trim();
+      var valor = parseFloat(m[2].replace(',', '.'));
+      if (valor > 0 && valor < 9999 && nome.length > 2) {
+        itens.push({ produto: capitalizar(nome), quantidade: '1 UN', valor: valor });
+        return;
+      }
+    }
+  });
+
+  return { estabelecimento: estabelecimento, pagamento: pagamento, itens: itens };
+}
+
+function capitalizar(txt) {
+  return txt.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+}
+
+function aplicarResultado(parsed) {
+  if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
+  if (parsed.pagamento) {
+    document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
+    show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
+  } else {
+    show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
+  }
+  if (parsed.itens && parsed.itens.length > 0) {
+    state.itens = parsed.itens;
+    save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
+    toast('Cupom lido! Verifique e edite os itens se necessário.');
+  } else {
+    toast('OCR concluído mas não encontrei itens. Adicione manualmente.');
+    show('cardItens'); show('cardExport'); atualizarTotais();
+  }
+}
+
 
 // ─── PAGAMENTO ────────────────────────────────────────────────────────────────
 function confirmarPgto(ok) {
@@ -756,7 +859,7 @@ function restoreUI() {
 
 // ─── CHAVE GEMINI ─────────────────────────────────────────────────────────────
 function configurarChave() {
-  var atual = localStorage.getItem('pd_gemini_key') || '';
+  var atual = localStorage.getItem('pd_pcloud_token') || '';
   show('cardChave');
   document.getElementById('inputChave').value = atual;
   document.getElementById('inputChave').focus();
@@ -771,10 +874,10 @@ function configurarDrive() {
 
 function salvarChave() {
   var v = document.getElementById('inputChave').value.trim();
-  if (!v) { toast('Cole a chave do Gemini'); return; }
-  localStorage.setItem('pd_gemini_key', v);
+  if (!v) { toast('Cole o token do pCloud'); return; }
+  localStorage.setItem('pd_pcloud_token', v);
   hide('cardChave');
-  toast('Chave salva! Agora pode fotografar o cupom.');
+  toast('Token pCloud salvo!');
 }
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
