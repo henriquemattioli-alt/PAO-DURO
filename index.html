@@ -233,6 +233,13 @@
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
       <span class="spinner"></span> Extraindo dados do cupom...
     </div>
+    <div id="debugBox" class="hidden" style="margin-top:10px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Texto bruto do OCR (copie e envie ao suporte):</div>
+      <textarea id="debugTexto" style="width:100%;height:200px;font-size:11px;font-family:monospace;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px;background:var(--bg2);color:var(--text)" readonly></textarea>
+      <button class="btn btn-gray btn-sm" style="margin-top:6px" onclick="copiarDebug()">
+        <i class="ti ti-copy"></i> Copiar texto
+      </button>
+    </div>
   </div>
 
   <!-- CARD: PAGAMENTO -->
@@ -531,9 +538,10 @@ function rodarOCR(canvas) {
   }).then(function(result) {
     hide('cupomProcessando');
     var texto = result.data.text;
-    console.log('OCR texto bruto:', texto);
+    // Mostra texto bruto para debug
+    document.getElementById('debugTexto').value = texto;
+    show('debugBox');
     var parsed = parsearCupom(texto);
-    console.log('Parsed:', parsed);
     aplicarResultado(parsed);
   }).catch(function(err) {
     hide('cupomProcessando');
@@ -636,6 +644,17 @@ function aplicarResultado(parsed) {
   }
 }
 
+
+function copiarDebug() {
+  var txt = document.getElementById('debugTexto').value;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(function() { toast('Texto copiado!'); });
+  } else {
+    document.getElementById('debugTexto').select();
+    document.execCommand('copy');
+    toast('Texto copiado!');
+  }
+}
 
 // ─── PAGAMENTO ────────────────────────────────────────────────────────────────
 function confirmarPgto(ok) {
