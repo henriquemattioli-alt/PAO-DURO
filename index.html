@@ -228,6 +228,12 @@
     <button class="btn btn-green" onclick="document.getElementById('cupomInput').click()">
       <i class="ti ti-camera"></i> Fotografar cupom fiscal
     </button>
+
+    <button class="btn btn-gray" style="margin-top:8px" onclick="iniciarReconhecimentoVoz()">
+      <i class="ti ti-microphone"></i> Lançar itens por voz
+    </button>
+
+    <div id="vozStatus" class="drive-status hidden"></div>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
     <img id="cupomPreview" class="preview-img" alt="Cupom">
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
@@ -464,13 +470,16 @@ function setEstab(nome, cidade) {
 function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
 
 
+
 // ─── GEMINI HELPERS ──────────────────────────────────────────────────────────
 async function chamarGeminiComRetry(url, options, tentativas) {
   tentativas = tentativas || 3;
 
   for (let i = 0; i < tentativas; i++) {
     try {
+
       var controller = new AbortController();
+
       var timeout = setTimeout(function() {
         controller.abort();
       }, 30000);
@@ -496,6 +505,7 @@ async function chamarGeminiComRetry(url, options, tentativas) {
       return await response.json();
 
     } catch (err) {
+
       if (i < tentativas - 1) {
         await new Promise(function(resolve) {
           setTimeout(resolve, (i + 1) * 3000);
@@ -508,6 +518,7 @@ async function chamarGeminiComRetry(url, options, tentativas) {
 }
 
 function extrairJsonSeguro(txt) {
+
   txt = txt.replace(/```json|```/g, '').trim();
 
   var ini = txt.indexOf('{');
@@ -564,17 +575,23 @@ function processarCupom(e) {
         },
         3
       ).then(function(data) {
+
         hide('cupomProcessando');
 
         if (!data.candidates || !data.candidates[0]) {
-          var erroMsg = (data.error && data.error.message) ? data.error.message : JSON.stringify(data);
+          var erroMsg = (data.error && data.error.message)
+            ? data.error.message
+            : JSON.stringify(data);
+
           alert('Erro Gemini: ' + erroMsg);
           return;
         }
 
         var txt = data.candidates[0].content.parts[0].text;
+
         var parsed = extrairJsonSeguro(txt);
-        if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
+
+if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
         if (parsed.pagamento) {
           document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
           show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
@@ -840,6 +857,152 @@ function salvarChave() {
   localStorage.setItem('pd_gemini_key', v);
   hide('cardChave');
   toast('Chave salva! Agora pode fotografar o cupom.');
+}
+
+
+
+// ─── RECONHECIMENTO DE VOZ ───────────────────────────────────────────────────
+var reconhecimento = null;
+var itemVozAtual = {};
+
+function iniciarReconhecimentoVoz() {
+
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Reconhecimento de voz não suportado neste navegador.');
+    return;
+  }
+
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  reconhecimento = new SpeechRecognition();
+
+  reconhecimento.lang = 'pt-BR';
+  reconhecimento.continuous = true;
+  reconhecimento.interimResults = false;
+
+  setVozStatus('info', '🎤 Ouvindo comandos...');
+
+  reconhecimento.onresult = function(event) {
+
+    var texto = event.results[event.results.length - 1][0].transcript
+      .toLowerCase()
+      .trim();
+
+    processarTextoVoz(texto);
+  };
+
+  reconhecimento.onerror = function(event) {
+    setVozStatus('err', 'Erro: ' + event.error);
+  };
+
+  reconhecimento.onend = function() {
+    setVozStatus('warn', 'Reconhecimento encerrado');
+  };
+
+  reconhecimento.start();
+
+  toast('Fale: produto, quantidade, unidade e preço');
+}
+
+function processarTextoVoz(texto) {
+
+  if (texto.includes('produto')) {
+
+    itemVozAtual.produto = texto
+      .replace('produto', '')
+      .trim();
+
+    setVozStatus('info', 'Produto: ' + itemVozAtual.produto);
+    return;
+  }
+
+  if (texto.includes('quantidade')) {
+
+    itemVozAtual.quantidade = texto
+      .replace('quantidade', '')
+      .trim();
+
+    setVozStatus('info', 'Quantidade: ' + itemVozAtual.quantidade);
+    return;
+  }
+
+  if (texto.includes('unidade')) {
+
+    itemVozAtual.unidade = texto
+      .replace('unidade', '')
+      .trim();
+
+    setVozStatus('info', 'Unidade: ' + itemVozAtual.unidade);
+    return;
+  }
+
+  if (texto.includes('preço') || texto.includes('preco')) {
+
+    var precoTexto = texto
+      .replace('preço', '')
+      .replace('preco', '')
+      .replace(',', '.')
+      .replace(' e ', '.')
+      .trim();
+
+    var valor = parseFloat(precoTexto.replace(/[^0-9.]/g, '')) || 0;
+
+    itemVozAtual.valor = valor;
+
+    adicionarItemPorVoz();
+  }
+}
+
+function adicionarItemPorVoz() {
+
+  if (!itemVozAtual.produto || !itemVozAtual.valor) {
+    setVozStatus('warn', 'Dados incompletos');
+    return;
+  }
+
+  var qtd = itemVozAtual.quantidade || '1';
+  var un = itemVozAtual.unidade || 'UN';
+
+  state.itens.push({
+    produto: capitalizar(itemVozAtual.produto),
+    quantidade: qtd + ' ' + un.toUpperCase(),
+    valor: itemVozAtual.valor
+  });
+
+  save();
+
+  renderItens();
+  atualizarTotais();
+
+  show('cardItens');
+  show('cardExport');
+
+  toast('Item adicionado por voz!');
+
+  setVozStatus(
+    'ok',
+    '✓ ' + capitalizar(itemVozAtual.produto) +
+    ' - R$ ' + itemVozAtual.valor.toFixed(2)
+  );
+
+  itemVozAtual = {};
+}
+
+function capitalizar(txt) {
+  return txt.replace(/\b\w/g, function(l) {
+    return l.toUpperCase();
+  });
+}
+
+function setVozStatus(type, msg) {
+
+  var el = document.getElementById('vozStatus');
+
+  el.className = 'drive-status ' + type;
+
+  el.textContent = msg;
+
+  el.classList.remove('hidden');
 }
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
