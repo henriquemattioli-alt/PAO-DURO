@@ -225,7 +225,7 @@
   <!-- CARD: CUPOM FISCAL -->
   <div class="card">
     <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
-    <button class="btn btn-green" onclick="document.getElementById('cupomInput').click()">
+    <button class="btn btn-green" onclick="alternarLeitorQR()">
       <i class="ti ti-qrcode"></i> Escanear QR Code
     </button>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
