@@ -580,8 +580,7 @@ function parsearHtmlSefaz(html) {
   for (var i = 0; i < sels.length; i++) {
     var el = doc.querySelector(sels[i]);
     if (el && el.textContent.trim().length > 2) {
-      resultado.estabelecimento = el.textContent.trim().split('
-')[0].trim();
+      resultado.estabelecimento = el.textContent.trim().split('\n')[0].trim();
       break;
     }
   }
