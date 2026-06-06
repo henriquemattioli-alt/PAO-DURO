@@ -144,6 +144,9 @@
     <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar Google Drive">
       <i class="ti ti-brand-google-drive"></i>
     </button>
+    <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar Google Drive">
+      <i class="ti ti-brand-google-drive"></i>
+    </button>
     <button class="btn btn-gray btn-sm" style="width:auto" onclick="novaCompra()">
       <i class="ti ti-refresh"></i> Nova
     </button>
@@ -224,14 +227,13 @@
 
   <!-- CARD: CUPOM FISCAL -->
   <div class="card">
-    <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
-    <button class="btn btn-green" onclick="document.getElementById('cupomInput').click()">
-      <i class="ti ti-camera"></i> Fotografar cupom fiscal
+    <div class="card-title"><i class="ti ti-qrcode"></i> Cupom fiscal — QR Code</div>
+    <button class="btn btn-green" id="btnQR" onclick="alternarLeitorQR()">
+      <i class="ti ti-qrcode"></i> Escanear QR Code do cupom
     </button>
-    <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
-    <img id="cupomPreview" class="preview-img" alt="Cupom">
+    <div id="qrReader" style="margin-top:10px;display:none"></div>
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
-      <span class="spinner"></span> Extraindo dados do cupom...
+      <span class="spinner"></span> Buscando dados na SEFAZ...
     </div>
   </div>
 
@@ -464,75 +466,190 @@ function setEstab(nome, cidade) {
 function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
 
 // ─── CUPOM / GEMINI ───────────────────────────────────────────────────────────
-function processarCupom(e) {
-  var file = e.target.files[0]; if (!file) return;
-  var geminiKey = localStorage.getItem('pd_gemini_key') || '';
-  if (!geminiKey) {
-    toast('Configure a chave Gemini primeiro! Toque no ícone de chave.');
-    show('cardChave');
-    document.getElementById('inputChave').focus();
+// ─── LEITOR QR CODE ──────────────────────────────────────────────────────────
+var qrAtivo = false;
+var qrScanner = null;
+
+function alternarLeitorQR() {
+  if (qrAtivo) {
+    pararQR();
+  } else {
+    iniciarQR();
+  }
+}
+
+function iniciarQR() {
+  // Carrega html5-qrcode via CDN se ainda não estiver carregado
+  if (!window.Html5Qrcode) {
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    script.onload = function() { abrirCamera(); };
+    script.onerror = function() { toast('Erro ao carregar leitor QR. Verifique conexão.'); };
+    document.head.appendChild(script);
+  } else {
+    abrirCamera();
+  }
+}
+
+function abrirCamera() {
+  var div = document.getElementById('qrReader');
+  div.style.display = 'block';
+  div.innerHTML = '';
+  qrScanner = new Html5Qrcode('qrReader');
+  qrAtivo = true;
+  document.getElementById('btnQR').innerHTML = '<i class="ti ti-x"></i> Fechar câmera';
+
+  qrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 280 } },
+    function(decodedText) {
+      // QR lido com sucesso
+      pararQR();
+      processarURLSefaz(decodedText);
+    },
+    function(error) { /* ignorar erros de scan */ }
+  ).catch(function(err) {
+    toast('Erro ao abrir câmera: ' + err);
+    pararQR();
+  });
+}
+
+function pararQR() {
+  qrAtivo = false;
+  if (qrScanner) {
+    qrScanner.stop().catch(function() {}).finally(function() {
+      document.getElementById('qrReader').style.display = 'none';
+      document.getElementById('qrReader').innerHTML = '';
+      qrScanner = null;
+    });
+  } else {
+    document.getElementById('qrReader').style.display = 'none';
+  }
+  document.getElementById('btnQR').innerHTML = '<i class="ti ti-qrcode"></i> Escanear QR Code do cupom';
+}
+
+// ─── SEFAZ VIA PROXY ─────────────────────────────────────────────────────────
+var PROXIES = [
+  function(url) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(url); },
+  function(url) { return 'https://corsproxy.io/?' + encodeURIComponent(url); }
+];
+
+function processarURLSefaz(url) {
+  if (!url.startsWith('http')) {
+    toast('QR Code inválido — não é um cupom fiscal.');
     return;
   }
-  var reader = new FileReader();
-  reader.onload = function(ev) {
-    var preview = document.getElementById('cupomPreview');
-    preview.src = ev.target.result; preview.style.display = 'block';
-    show('cupomProcessando');
-    hide('cardItens'); hide('cardPagamento'); hide('cardExport');
-
-    var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var maxW = 1024;
-      var scale = img.width > maxW ? maxW / img.width : 1;
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      var base64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
-
-      fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + geminiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-              { text: 'Analise este cupom fiscal brasileiro. Extraia: nome do estabelecimento, forma de pagamento e lista completa de itens. REGRAS: 1) Se uma linha tiver valor NEGATIVO, é desconto — subtraia do item anterior e registre o valor final positivo. 2) Se o valor for POSITIVO, é o preço final — use diretamente. 3) Nunca registre valores negativos no JSON. 4) Ignore descontos gerais no total da compra. 5) Nome curto e legível, sem códigos de barras. 6) Valor final = o que o consumidor efetivamente pagou. Responda APENAS em JSON sem markdown: {"estabelecimento":"nome","pagamento":"Dinheiro|Pix|Debito|Credito","itens":[{"produto":"nome curto","quantidade":"1 UN ou 0.746 KG","valor":4.50}]}. Valores decimais com ponto.' }
-            ]
-          }],
-          generationConfig: { temperature: 0.1 }
-        })
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        hide('cupomProcessando');
-        if (!data.candidates || !data.candidates[0]) {
-          alert('Erro Gemini: ' + JSON.stringify(data)); return;
-        }
-        var txt = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        var parsed = JSON.parse(txt);
-        if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
-        if (parsed.pagamento) {
-          document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
-          show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
-        } else {
-          show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
-        }
-        if (parsed.itens && parsed.itens.length > 0) {
-          state.itens = parsed.itens.map(function(i) {
-            return { produto: i.produto, quantidade: i.quantidade || '1 UN', valor: parseFloat(i.valor) || 0 };
-          });
-          save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
-        }
-        toast('Cupom processado com sucesso!');
-      }).catch(function(err) {
-        hide('cupomProcessando');
-        alert('ERRO: ' + err.message);
-        toast('Erro ao processar — tente novamente');
-      });
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+  toast('QR lido! Buscando dados na SEFAZ...', 4000);
+  show('cupomProcessando');
+  hide('cardItens'); hide('cardPagamento'); hide('cardExport');
+  tentarProxies(url, 0);
 }
+
+function tentarProxies(urlSefaz, idx) {
+  if (idx >= PROXIES.length) {
+    hide('cupomProcessando');
+    toast('Não foi possível buscar automaticamente. Abrindo SEFAZ...', 4000);
+    setTimeout(function() { window.open(urlSefaz, '_blank'); }, 1000);
+    show('cardItens'); show('cardExport'); atualizarTotais();
+    return;
+  }
+  fetch(PROXIES[idx](urlSefaz))
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      var html = data.contents || (typeof data === 'string' ? data : '');
+      if (!html || html.length < 200) throw new Error('HTML vazio');
+      hide('cupomProcessando');
+      var parsed = parsearHtmlSefaz(html);
+      aplicarResultadoSefaz(parsed, urlSefaz);
+    })
+    .catch(function(err) {
+      console.warn('Proxy ' + idx + ' falhou:', err.message);
+      tentarProxies(urlSefaz, idx + 1);
+    });
+}
+
+function parsearHtmlSefaz(html) {
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var resultado = { estabelecimento: '', pagamento: '', itens: [] };
+
+  // Estabelecimento — SEFAZ-SP usa div com id u20 ou classe NomEmit
+  var sels = ['#u20', '.NomEmit', '#conteudo h4', 'h4', '.txtTopo'];
+  for (var i = 0; i < sels.length; i++) {
+    var el = doc.querySelector(sels[i]);
+    if (el && el.textContent.trim().length > 2) {
+      resultado.estabelecimento = el.textContent.trim().split('
+')[0].trim();
+      break;
+    }
+  }
+
+  // Pagamento
+  var txt = (doc.body ? doc.body.textContent : html).toLowerCase();
+  if (/pix/.test(txt))              resultado.pagamento = 'Pix';
+  else if (/cr[eé]dito/.test(txt))      resultado.pagamento = 'Credito';
+  else if (/d[eé]bito/.test(txt))       resultado.pagamento = 'Debito';
+  else if (/dinheiro|esp[eé]cie/.test(txt)) resultado.pagamento = 'Dinheiro';
+
+  // Itens — SEFAZ-SP: tabela com linhas de produtos
+  var linhas = doc.querySelectorAll('#tabResult tr, .toItens tr, .box-produto, tr');
+  linhas.forEach(function(tr) {
+    var cols = tr.querySelectorAll('td');
+    if (cols.length < 2) return;
+    var txts = Array.from(cols).map(function(c) { return c.textContent.trim(); });
+    var nome = txts[0] || '';
+    if (nome.length < 2 || /produto|descri|c[oó]d|item/i.test(nome)) return;
+    var valor = 0;
+    for (var j = txts.length - 1; j >= 1; j--) {
+      var v = parseFloat(txts[j].replace(/[^\d,]/g,'').replace(',','.'));
+      if (v > 0 && v < 99999) { valor = v; break; }
+    }
+    var qtd = '1 UN';
+    for (var j = 1; j < txts.length - 1; j++) {
+      if (/\d+[,.]?\d*\s*(UN|KG|LT|PC|CX|G|L)/i.test(txts[j])) { qtd = txts[j]; break; }
+    }
+    if (valor > 0) {
+      resultado.itens.push({ produto: capNome(nome), quantidade: qtd, valor: valor });
+    }
+  });
+
+  return resultado;
+}
+
+function capNome(txt) {
+  return txt.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+}
+
+function aplicarResultadoSefaz(parsed, urlOriginal) {
+  if (!state.estab && parsed.estabelecimento) {
+    mostrarConfirmEstab(parsed.estabelecimento, '');
+  }
+  if (parsed.pagamento) {
+    document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
+    show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
+  } else {
+    show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
+  }
+  if (parsed.itens && parsed.itens.length > 0) {
+    state.itens = parsed.itens;
+    save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
+    toast('✓ ' + parsed.itens.length + ' itens extraídos da SEFAZ!');
+  } else {
+    // Nenhum item extraído — abre a página para consulta manual
+    toast('Dados parciais. Verifique a página da SEFAZ.', 4000);
+    window.open(urlOriginal, '_blank');
+    show('cardItens'); show('cardExport'); atualizarTotais();
+  }
+}
+
+// ─── LIMPEZA NOVA COMPRA (atualizada para QR) ─────────────────────────────────
+function limparQR() {
+  pararQR();
+  document.getElementById('cupomInput') && (document.getElementById('cupomInput').value = '');
+}
+
 
 // ─── PAGAMENTO ────────────────────────────────────────────────────────────────
 function confirmarPgto(ok) {
@@ -733,7 +850,7 @@ function novaCompra() {
   ['confirmEstab','manualEstab','estabConfirmado','confirmPgto','manualPgto',
    'pgtoConfirmado','cardItens','cardPagamento','cardExport','driveStatus'].forEach(hide);
   document.getElementById('cupomPreview').style.display = 'none';
-  document.getElementById('cupomInput').value = '';
+  limparQR();
   setGpsStatus('info', 'Aguardando GPS...');
   document.getElementById('itemCount').textContent = '0';
   drivePendingCSV = null; drivePendingFile = null; driveAccessToken = '';
