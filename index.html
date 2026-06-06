@@ -463,6 +463,151 @@ function setEstab(nome, cidade) {
 
 function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
 
+
+// ─── LEITOR QR CODE ──────────────────────────────────────────────────────────
+var qrAtivo = false;
+var qrScanner = null;
+
+function alternarLeitorQR() {
+  if (qrAtivo) { pararQR(); } else { iniciarQR(); }
+}
+
+function iniciarQR() {
+  if (!window.Html5Qrcode) {
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    script.onload = function() { abrirCamera(); };
+    script.onerror = function() { toast('Erro ao carregar leitor QR.'); };
+    document.head.appendChild(script);
+  } else {
+    abrirCamera();
+  }
+}
+
+function abrirCamera() {
+  var div = document.getElementById('qrReader');
+  div.style.display = 'block';
+  div.innerHTML = '';
+  qrScanner = new Html5Qrcode('qrReader');
+  qrAtivo = true;
+  document.getElementById('btnQR').innerHTML = '<i class="ti ti-x"></i> Fechar câmera';
+  qrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    function(texto) { pararQR(); processarURLSefaz(texto); },
+    function() {}
+  ).catch(function(err) { toast('Erro câmera: ' + err); pararQR(); });
+}
+
+function pararQR() {
+  qrAtivo = false;
+  if (qrScanner) {
+    qrScanner.stop().catch(function(){}).finally(function() {
+      document.getElementById('qrReader').style.display = 'none';
+      document.getElementById('qrReader').innerHTML = '';
+      qrScanner = null;
+    });
+  } else {
+    document.getElementById('qrReader').style.display = 'none';
+  }
+  document.getElementById('btnQR').innerHTML = '<i class="ti ti-qrcode"></i> Escanear QR Code';
+}
+
+// ─── SEFAZ VIA PROXY ──────────────────────────────────────────────────────────
+var PROXIES = [
+  function(url) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(url); },
+  function(url) { return 'https://corsproxy.io/?' + encodeURIComponent(url); }
+];
+
+function processarURLSefaz(url) {
+  if (!url || !url.startsWith('http')) { toast('QR inválido.'); return; }
+  toast('QR lido! Buscando na SEFAZ...', 4000);
+  show('cupomProcessando');
+  hide('cardItens'); hide('cardPagamento'); hide('cardExport');
+  tentarProxies(url, 0);
+}
+
+function tentarProxies(urlSefaz, idx) {
+  if (idx >= PROXIES.length) {
+    hide('cupomProcessando');
+    toast('Abrindo página da SEFAZ...', 3000);
+    setTimeout(function() { window.open(urlSefaz, '_blank'); }, 1000);
+    show('cardItens'); show('cardExport'); atualizarTotais();
+    return;
+  }
+  fetch(PROXIES[idx](urlSefaz))
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      var html = data.contents || '';
+      if (!html || html.length < 200) throw new Error('vazio');
+      hide('cupomProcessando');
+      aplicarResultadoSefaz(parsearHtmlSefaz(html), urlSefaz);
+    })
+    .catch(function(err) {
+      console.warn('Proxy ' + idx + ' falhou:', err.message);
+      tentarProxies(urlSefaz, idx + 1);
+    });
+}
+
+function parsearHtmlSefaz(html) {
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var r = { estabelecimento: '', pagamento: '', itens: [] };
+  var sels = ['#u20', '.NomEmit', '#conteudo h4', 'h4', '.txtTopo'];
+  for (var i = 0; i < sels.length; i++) {
+    var el = doc.querySelector(sels[i]);
+    if (el && el.textContent.trim().length > 2) {
+      r.estabelecimento = el.textContent.trim().split('\n')[0].trim();
+      break;
+    }
+  }
+  var txt = (doc.body ? doc.body.textContent : html).toLowerCase();
+  if (/\bpix\b/.test(txt)) r.pagamento = 'Pix';
+  else if (/credito/.test(txt)) r.pagamento = 'Credito';
+  else if (/debito/.test(txt)) r.pagamento = 'Debito';
+  else if (/dinheiro/.test(txt)) r.pagamento = 'Dinheiro';
+  doc.querySelectorAll('#tabResult tr, .toItens tr, tr').forEach(function(tr) {
+    var cols = tr.querySelectorAll('td');
+    if (cols.length < 2) return;
+    var txts = Array.from(cols).map(function(c) { return c.textContent.trim(); });
+    var nome = txts[0] || '';
+    if (nome.length < 2 || /produto|descri|cod|item/i.test(nome)) return;
+    var valor = 0;
+    for (var j = txts.length - 1; j >= 1; j--) {
+      var v = parseFloat(txts[j].replace(/[^\d,]/g,'').replace(',','.'));
+      if (v > 0 && v < 99999) { valor = v; break; }
+    }
+    var qtd = '1 UN';
+    for (var j = 1; j < txts.length - 1; j++) {
+      if (/\d+[,.]?\d*\s*(UN|KG|LT|PC|CX|G|L)/i.test(txts[j])) { qtd = txts[j]; break; }
+    }
+    if (valor > 0) r.itens.push({ produto: capNome(nome), quantidade: qtd, valor: valor });
+  });
+  return r;
+}
+
+function capNome(txt) {
+  return txt.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+}
+
+function aplicarResultadoSefaz(parsed, urlOriginal) {
+  if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
+  if (parsed.pagamento) {
+    document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
+    show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
+  } else {
+    show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
+  }
+  if (parsed.itens && parsed.itens.length > 0) {
+    state.itens = parsed.itens;
+    save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
+    toast('✓ ' + parsed.itens.length + ' itens extraídos da SEFAZ!');
+  } else {
+    toast('Itens não extraídos — adicione manualmente.', 4000);
+    if (urlOriginal) window.open(urlOriginal, '_blank');
+    show('cardItens'); show('cardExport'); atualizarTotais();
+  }
+}
+
 // ─── CUPOM / GEMINI ───────────────────────────────────────────────────────────
 function processarCupom(e) {
   var file = e.target.files[0]; if (!file) return;
