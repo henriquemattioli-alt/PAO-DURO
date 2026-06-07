@@ -231,7 +231,7 @@
     <input type="file" id="qrFotoInput" accept="image/*" capture="environment" class="hidden" onchange="lerQRDeFoto(event)">
     <div id="qrReader" style="display:none"></div>
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
-      <span class="spinner"></span> Buscando dados na SEFAZ...
+      <span class="spinner"></span> Lendo QR Code...
     </div>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
     <img id="cupomPreview" class="preview-img" alt="Cupom">
@@ -805,96 +805,70 @@ function alternarLeitorQR() {
 
 function lerQRDeFoto(e) {
   var file = e.target.files[0]; if (!file) return;
-  toast('Lendo QR Code...', 3000);
-  show('cupomProcessando');
 
-  // Carrega jsQR se necessário
-  if (!window.jsQR) {
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
-    script.onload = function() { processarFotoQR(file); };
-    script.onerror = function() { hide('cupomProcessando'); toast('Erro ao carregar leitor QR.'); };
-    document.head.appendChild(script);
-  } else {
-    processarFotoQR(file);
+  var geminiKey = localStorage.getItem('pd_gemini_key') || '';
+  if (!geminiKey) {
+    toast('Configure a chave Gemini primeiro!');
+    configurarChave();
+    return;
   }
-}
 
-function processarFotoQR(file) {
+  show('cupomProcessando');
+  document.getElementById('cupomProcessando').innerHTML =
+    '<span class="spinner"></span> Lendo QR Code...';
+
   var reader = new FileReader();
   reader.onload = function(ev) {
     var img = new Image();
     img.onload = function() {
-      var url = tentarLerQR(img);
-      hide('cupomProcessando');
-      if (url) {
-        console.log('QR lido:', url);
-        processarURLSefaz(url);
-      } else {
-        toast('Nao consegui ler o QR. Fotografe so o QR Code com boa iluminacao.', 5000);
-      }
+      // Reduz imagem para economizar tokens — QR não precisa de alta res
+      var canvas = document.createElement('canvas');
+      var maxW = 600;
+      var scale = img.width > maxW ? maxW / img.width : 1;
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      var base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+      fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              { text: 'Esta imagem contém um QR Code de cupom fiscal brasileiro (NFC-e). Leia o QR Code e retorne APENAS a URL completa que ele contém, sem nenhum texto adicional, sem markdown, sem explicação. Apenas a URL.' }
+            ]
+          }],
+          generationConfig: { temperature: 0 }
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.candidates || !data.candidates[0]) {
+          hide('cupomProcessando');
+          toast('Erro ao ler QR. Verifique a chave Gemini.');
+          return;
+        }
+        var url = data.candidates[0].content.parts[0].text.trim();
+        console.log('URL do QR via Gemini:', url);
+        if (url.startsWith('http')) {
+          document.getElementById('cupomProcessando').innerHTML =
+            '<span class="spinner"></span> Buscando dados na SEFAZ...';
+          tentarProxies(url, 0);
+        } else {
+          hide('cupomProcessando');
+          toast('QR lido mas URL inválida: ' + url, 4000);
+        }
+      })
+      .catch(function(err) {
+        hide('cupomProcessando');
+        toast('Erro: ' + err.message);
+      });
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
-}
-
-function tentarLerQR(img) {
-  // Passo 1: tenta imagem inteira em várias resoluções
-  var resolucoes = [600, 800, 1000, 1200];
-  for (var r = 0; r < resolucoes.length; r++) {
-    var res = resolucoes[r];
-    var result = lerQRCanvas(img, 0, 0, img.width, img.height, res, Math.round(res * img.height / img.width));
-    if (result) return result;
-  }
-
-  // Passo 2: sliding window — divide em 9 regiões (3x3)
-  var grades = [2, 3];
-  for (var g = 0; g < grades.length; g++) {
-    var n = grades[g];
-    var stepX = img.width  / n;
-    var stepY = img.height / n;
-    // Com sobreposição de 20%
-    var overX = stepX * 0.2;
-    var overY = stepY * 0.2;
-    for (var row = 0; row < n; row++) {
-      for (var col = 0; col < n; col++) {
-        var sx = Math.max(0, col * stepX - overX);
-        var sy = Math.max(0, row * stepY - overY);
-        var sw = Math.min(img.width  - sx, stepX + overX * 2);
-        var sh = Math.min(img.height - sy, stepY + overY * 2);
-        var result = lerQRCanvas(img, sx, sy, sw, sh, 600, 600);
-        if (result) return result;
-      }
-    }
-  }
-  return null;
-}
-
-function lerQRCanvas(img, sx, sy, sw, sh, dw, dh) {
-  var canvas = document.createElement('canvas');
-  canvas.width = dw; canvas.height = dh;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
-
-  // Tenta normal
-  var data = ctx.getImageData(0, 0, dw, dh);
-  var code = jsQR(data.data, dw, dh, { inversionAttempts: 'attemptBoth' });
-  if (code && code.data) return code.data;
-
-  // Tenta binarizado
-  var d = data.data;
-  for (var i = 0; i < d.length; i += 4) {
-    var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-    var val = gray > 140 ? 255 : 0;
-    d[i] = d[i+1] = d[i+2] = val;
-  }
-  ctx.putImageData(data, 0, 0);
-  data = ctx.getImageData(0, 0, dw, dh);
-  code = jsQR(data.data, dw, dh, { inversionAttempts: 'attemptBoth' });
-  if (code && code.data) return code.data;
-
-  return null;
 }
 
 
