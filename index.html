@@ -806,69 +806,76 @@ function alternarLeitorQR() {
 function lerQRDeFoto(e) {
   var file = e.target.files[0]; if (!file) return;
 
-  var geminiKey = localStorage.getItem('pd_gemini_key') || '';
-  if (!geminiKey) {
-    toast('Configure a chave Gemini primeiro!');
-    configurarChave();
-    return;
-  }
-
   show('cupomProcessando');
   document.getElementById('cupomProcessando').innerHTML =
     '<span class="spinner"></span> Lendo QR Code...';
 
-  var reader = new FileReader();
-  reader.onload = function(ev) {
-    var img = new Image();
-    img.onload = function() {
-      // Reduz imagem para economizar tokens — QR não precisa de alta res
-      var canvas = document.createElement('canvas');
-      var maxW = 600;
-      var scale = img.width > maxW ? maxW / img.width : 1;
-      canvas.width  = Math.round(img.width  * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      var base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-
-      fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-              { text: 'Esta imagem contém um QR Code de cupom fiscal brasileiro (NFC-e). Leia o QR Code e retorne APENAS a URL completa que ele contém, sem nenhum texto adicional, sem markdown, sem explicação. Apenas a URL.' }
-            ]
-          }],
-          generationConfig: { temperature: 0 }
-        })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (!data.candidates || !data.candidates[0]) {
-          hide('cupomProcessando');
-          toast('Erro ao ler QR. Verifique a chave Gemini.');
-          return;
-        }
-        var url = data.candidates[0].content.parts[0].text.trim();
-        console.log('URL do QR via Gemini:', url);
+  // Tenta BarcodeDetector nativa primeiro (Android/Chrome nativo)
+  if ('BarcodeDetector' in window) {
+    var detector = new BarcodeDetector({ formats: ['qr_code'] });
+    createImageBitmap(file).then(function(bitmap) {
+      return detector.detect(bitmap);
+    }).then(function(barcodes) {
+      if (barcodes.length > 0) {
+        var url = barcodes[0].rawValue;
+        console.log('BarcodeDetector leu:', url);
+        hide('cupomProcessando');
         if (url.startsWith('http')) {
           document.getElementById('cupomProcessando').innerHTML =
             '<span class="spinner"></span> Buscando dados na SEFAZ...';
-          tentarProxies(url, 0);
+          show('cupomProcessando');
+          tentarProxies(url);
         } else {
-          hide('cupomProcessando');
-          toast('QR lido mas URL inválida: ' + url, 4000);
+          toast('QR lido mas URL invalida.', 4000);
         }
-      })
-      .catch(function(err) {
-        hide('cupomProcessando');
-        toast('Erro: ' + err.message);
-      });
+      } else {
+        // BarcodeDetector não achou — tenta nimiq/qr-scanner
+        lerComNimiq(file);
+      }
+    }).catch(function() {
+      lerComNimiq(file);
+    });
+  } else {
+    // Sem BarcodeDetector — usa nimiq/qr-scanner
+    lerComNimiq(file);
+  }
+}
+
+function lerComNimiq(file) {
+  if (!window.QrScanner) {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.umd.min.js';
+    script.onload = function() { fazerScanNimiq(file); };
+    script.onerror = function() {
+      hide('cupomProcessando');
+      toast('Erro ao carregar leitor QR.', 3000);
     };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+    document.head.appendChild(script);
+  } else {
+    fazerScanNimiq(file);
+  }
+}
+
+function fazerScanNimiq(file) {
+  QrScanner.scanImage(file, { returnDetailedScanResult: true })
+    .then(function(result) {
+      hide('cupomProcessando');
+      var url = result.data;
+      console.log('QrScanner leu:', url);
+      if (url && url.startsWith('http')) {
+        document.getElementById('cupomProcessando').innerHTML =
+          '<span class="spinner"></span> Buscando dados na SEFAZ...';
+        show('cupomProcessando');
+        tentarProxies(url);
+      } else {
+        toast('QR lido mas URL invalida: ' + url, 4000);
+      }
+    })
+    .catch(function(err) {
+      hide('cupomProcessando');
+      console.warn('QrScanner erro:', err);
+      toast('Nao consegui ler o QR. Tente com melhor iluminacao e foco.', 5000);
+    });
 }
 
 
