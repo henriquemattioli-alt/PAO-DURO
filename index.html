@@ -226,8 +226,12 @@
   <div class="card">
     <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
     <button class="btn btn-green" onclick="alternarLeitorQR()" id="btnQR">
-      <i class="ti ti-qrcode"></i> Escanear QR Code
+      <i class="ti ti-qrcode"></i> Escanear QR Code (câmera)
     </button>
+    <button class="btn btn-gray" style="margin-top:8px" onclick="document.getElementById('qrFotoInput').click()">
+      <i class="ti ti-photo"></i> Fotografar QR Code
+    </button>
+    <input type="file" id="qrFotoInput" accept="image/*" capture="environment" class="hidden" onchange="lerQRDeFoto(event)">
     <div id="qrReader" style="margin-top:10px;display:none"></div>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
     <img id="cupomPreview" class="preview-img" alt="Cupom">
@@ -840,7 +844,35 @@ function pararQR() {
   } else {
     document.getElementById('qrReader').style.display = 'none';
   }
-  document.getElementById('btnQR').innerHTML = '<i class="ti ti-qrcode"></i> Escanear QR Code';
+  document.getElementById('btnQR').innerHTML = '<i class="ti ti-qrcode"></i> Escanear QR Code (câmera)';
+}
+
+function lerQRDeFoto(e) {
+  var file = e.target.files[0]; if (!file) return;
+  if (!window.Html5Qrcode) {
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    script.onload = function() { lerQRDeFotoComLib(file); };
+    document.head.appendChild(script);
+  } else {
+    lerQRDeFotoComLib(file);
+  }
+}
+
+function lerQRDeFotoComLib(file) {
+  var leitor = new Html5Qrcode('qrReader');
+  document.getElementById('qrReader').style.display = 'block';
+  leitor.scanFile(file, true)
+    .then(function(url) {
+      document.getElementById('qrReader').style.display = 'none';
+      document.getElementById('qrReader').innerHTML = '';
+      processarURLSefaz(url);
+    })
+    .catch(function(err) {
+      document.getElementById('qrReader').style.display = 'none';
+      toast('Nao consegui ler o QR da foto. Tente novamente com melhor iluminacao.');
+      console.warn('QR foto erro:', err);
+    });
 }
 
 var PROXIES = [
