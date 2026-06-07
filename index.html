@@ -825,25 +825,44 @@ function processarFotoQR(file) {
   reader.onload = function(ev) {
     var img = new Image();
     img.onload = function() {
-      // Tenta múltiplas resoluções para melhorar leitura
-      var tamanhos = [
-        { w: img.width, h: img.height },           // original
-        { w: img.width * 2, h: img.height * 2 },   // dobro
-        { w: 1200, h: Math.round(1200 * img.height / img.width) } // normalizado
+      var url = null;
+
+      // Tenta várias combinações de tamanho e processamento
+      var tentativas = [
+        { escala: 1.0,  contraste: false },
+        { escala: 1.5,  contraste: false },
+        { escala: 2.0,  contraste: false },
+        { escala: 1.0,  contraste: true  },
+        { escala: 1.5,  contraste: true  },
+        { escala: 2.0,  contraste: true  },
       ];
 
-      var url = null;
-      for (var i = 0; i < tamanhos.length; i++) {
+      for (var t = 0; t < tentativas.length && !url; t++) {
+        var tent = tentativas[t];
         var canvas = document.createElement('canvas');
-        canvas.width  = tamanhos[i].w;
-        canvas.height = tamanhos[i].h;
+        canvas.width  = Math.round(img.width  * tent.escala);
+        canvas.height = Math.round(img.height * tent.escala);
         var ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        if (tent.contraste) {
+          // Aumenta contraste e binariza para lidar com reflexos
+          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var d = imgData.data;
+          for (var i = 0; i < d.length; i += 4) {
+            var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+            // Binarização adaptativa simples — limiar 128
+            var val = gray > 128 ? 255 : 0;
+            d[i] = d[i+1] = d[i+2] = val;
+          }
+          ctx.putImageData(imgData, 0, 0);
+        }
+
         var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         var code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
+          inversionAttempts: 'attemptBoth'
         });
-        if (code && code.data) { url = code.data; break; }
+        if (code && code.data) { url = code.data; }
       }
 
       hide('cupomProcessando');
@@ -851,7 +870,7 @@ function processarFotoQR(file) {
         console.log('QR lido:', url);
         processarURLSefaz(url);
       } else {
-        toast('Nao consegui ler o QR. Tente com mais luz e foco no QR Code.', 4000);
+        toast('Nao consegui ler o QR. Tente com luz direta, sem reflexo, e foco no QR.', 5000);
       }
     };
     img.src = ev.target.result;
