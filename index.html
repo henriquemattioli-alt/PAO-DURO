@@ -825,58 +825,78 @@ function processarFotoQR(file) {
   reader.onload = function(ev) {
     var img = new Image();
     img.onload = function() {
-      var url = null;
-
-      // Tenta várias combinações de tamanho e processamento
-      var tentativas = [
-        { escala: 1.0,  contraste: false },
-        { escala: 1.5,  contraste: false },
-        { escala: 2.0,  contraste: false },
-        { escala: 1.0,  contraste: true  },
-        { escala: 1.5,  contraste: true  },
-        { escala: 2.0,  contraste: true  },
-      ];
-
-      for (var t = 0; t < tentativas.length && !url; t++) {
-        var tent = tentativas[t];
-        var canvas = document.createElement('canvas');
-        canvas.width  = Math.round(img.width  * tent.escala);
-        canvas.height = Math.round(img.height * tent.escala);
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        if (tent.contraste) {
-          // Aumenta contraste e binariza para lidar com reflexos
-          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          var d = imgData.data;
-          for (var i = 0; i < d.length; i += 4) {
-            var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-            // Binarização adaptativa simples — limiar 128
-            var val = gray > 128 ? 255 : 0;
-            d[i] = d[i+1] = d[i+2] = val;
-          }
-          ctx.putImageData(imgData, 0, 0);
-        }
-
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'attemptBoth'
-        });
-        if (code && code.data) { url = code.data; }
-      }
-
+      var url = tentarLerQR(img);
       hide('cupomProcessando');
       if (url) {
         console.log('QR lido:', url);
         processarURLSefaz(url);
       } else {
-        toast('Nao consegui ler o QR. Tente com luz direta, sem reflexo, e foco no QR.', 5000);
+        toast('Nao consegui ler o QR. Fotografe so o QR Code com boa iluminacao.', 5000);
       }
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
+
+function tentarLerQR(img) {
+  // Passo 1: tenta imagem inteira em várias resoluções
+  var resolucoes = [600, 800, 1000, 1200];
+  for (var r = 0; r < resolucoes.length; r++) {
+    var res = resolucoes[r];
+    var result = lerQRCanvas(img, 0, 0, img.width, img.height, res, Math.round(res * img.height / img.width));
+    if (result) return result;
+  }
+
+  // Passo 2: sliding window — divide em 9 regiões (3x3)
+  var grades = [2, 3];
+  for (var g = 0; g < grades.length; g++) {
+    var n = grades[g];
+    var stepX = img.width  / n;
+    var stepY = img.height / n;
+    // Com sobreposição de 20%
+    var overX = stepX * 0.2;
+    var overY = stepY * 0.2;
+    for (var row = 0; row < n; row++) {
+      for (var col = 0; col < n; col++) {
+        var sx = Math.max(0, col * stepX - overX);
+        var sy = Math.max(0, row * stepY - overY);
+        var sw = Math.min(img.width  - sx, stepX + overX * 2);
+        var sh = Math.min(img.height - sy, stepY + overY * 2);
+        var result = lerQRCanvas(img, sx, sy, sw, sh, 600, 600);
+        if (result) return result;
+      }
+    }
+  }
+  return null;
+}
+
+function lerQRCanvas(img, sx, sy, sw, sh, dw, dh) {
+  var canvas = document.createElement('canvas');
+  canvas.width = dw; canvas.height = dh;
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
+
+  // Tenta normal
+  var data = ctx.getImageData(0, 0, dw, dh);
+  var code = jsQR(data.data, dw, dh, { inversionAttempts: 'attemptBoth' });
+  if (code && code.data) return code.data;
+
+  // Tenta binarizado
+  var d = data.data;
+  for (var i = 0; i < d.length; i += 4) {
+    var gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+    var val = gray > 140 ? 255 : 0;
+    d[i] = d[i+1] = d[i+2] = val;
+  }
+  ctx.putImageData(data, 0, 0);
+  data = ctx.getImageData(0, 0, dw, dh);
+  code = jsQR(data.data, dw, dh, { inversionAttempts: 'attemptBoth' });
+  if (code && code.data) return code.data;
+
+  return null;
+}
+
 
 var PROXIES = [
   function(url) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(url); },
