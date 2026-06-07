@@ -823,7 +823,7 @@ function abrirCamera() {
   document.getElementById('btnQR').innerHTML = '<i class="ti ti-x"></i> Fechar câmera';
   qrScanner.start(
     { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 250, height: 250 } },
+    { fps: 15, qrbox: { width: 150, height: 150 } },
     function(texto) { pararQR(); processarURLSefaz(texto); },
     function() {}
   ).catch(function(err) { toast('Erro camera: ' + err); pararQR(); });
