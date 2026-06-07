@@ -926,8 +926,7 @@ function parsearHtmlSefaz(html) {
   // Linha de qtd: "Qtde.:N UN: Kg Vl. Unit.: X,XX  X,XX"
   var reNome  = /^([A-ZÀ-Ÿa-z][A-ZÀ-Ÿa-z0-9 .,]{2,40}?)\s*\(C.digo:/m;
   var reQtd   = /Qtde\.:([0-9,.]+)\s*(UN|Kg|Lt|Pc|Cx|g|ml)?/i;
-  var reValor = /Vl\.\s*Total\s*[
-\s]*([\d,.]+)/i;
+  var reValor = /Vl\.\s*Total[\s\S]{0,20}?([\d,.]+)/i;
 
   // Divide o texto em blocos por item
   var blocos = txt.split(/(?=\w[\w ,]+\(C.digo:)/);
