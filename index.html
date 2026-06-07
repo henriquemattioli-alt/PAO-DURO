@@ -826,17 +826,14 @@ function abrirCamera() {
   qrAtivo = true;
   document.getElementById('btnQR').innerHTML = '<i class="ti ti-x"></i> Fechar câmera';
 
-  // Configuração avançada — resolução alta + zoom 2x para QR pequenos
+  // Janela grande — usuário afasta o celular para enquadrar o QR
   var config = {
     fps: 15,
-    qrbox: { width: 200, height: 200 },
-    aspectRatio: 1.0,
-    videoConstraints: {
-      facingMode: 'environment',
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      advanced: [{ zoom: 2 }]
-    }
+    qrbox: function(w, h) {
+      var menor = Math.min(w, h);
+      return { width: Math.round(menor * 0.8), height: Math.round(menor * 0.8) };
+    },
+    aspectRatio: 1.0
   };
 
   qrScanner.start(
