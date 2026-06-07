@@ -825,9 +825,23 @@ function abrirCamera() {
   qrScanner = new Html5Qrcode('qrReader');
   qrAtivo = true;
   document.getElementById('btnQR').innerHTML = '<i class="ti ti-x"></i> Fechar câmera';
+
+  // Configuração avançada — resolução alta + zoom 2x para QR pequenos
+  var config = {
+    fps: 15,
+    qrbox: { width: 200, height: 200 },
+    aspectRatio: 1.0,
+    videoConstraints: {
+      facingMode: 'environment',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      advanced: [{ zoom: 2 }]
+    }
+  };
+
   qrScanner.start(
     { facingMode: 'environment' },
-    { fps: 15, qrbox: { width: 150, height: 150 } },
+    config,
     function(texto) { pararQR(); processarURLSefaz(texto); },
     function() {}
   ).catch(function(err) { toast('Erro camera: ' + err); pararQR(); });
@@ -860,17 +874,25 @@ function lerQRDeFoto(e) {
 }
 
 function lerQRDeFotoComLib(file) {
-  var leitor = new Html5Qrcode('qrReader');
-  document.getElementById('qrReader').style.display = 'block';
+  // Cria elemento temporário invisível para o scanner
+  var tempId = 'qrTemp_' + Date.now();
+  var tempDiv = document.createElement('div');
+  tempDiv.id = tempId;
+  tempDiv.style.display = 'none';
+  document.body.appendChild(tempDiv);
+
+  var leitor = new Html5Qrcode(tempId);
+  toast('Lendo QR da foto...', 3000);
+
   leitor.scanFile(file, true)
     .then(function(url) {
-      document.getElementById('qrReader').style.display = 'none';
-      document.getElementById('qrReader').innerHTML = '';
+      document.body.removeChild(tempDiv);
+      console.log('QR lido da foto:', url);
       processarURLSefaz(url);
     })
     .catch(function(err) {
-      document.getElementById('qrReader').style.display = 'none';
-      toast('Nao consegui ler o QR da foto. Tente novamente com melhor iluminacao.');
+      document.body.removeChild(tempDiv);
+      toast('Nao consegui ler o QR. Tente com mais luz e distancia.');
       console.warn('QR foto erro:', err);
     });
 }
