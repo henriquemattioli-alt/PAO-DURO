@@ -225,14 +225,14 @@
   <!-- CARD: CUPOM FISCAL -->
   <div class="card">
     <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
-    <button class="btn btn-green" onclick="alternarLeitorQR()" id="btnQR">
-      <i class="ti ti-qrcode"></i> Escanear QR Code (câmera)
-    </button>
-    <button class="btn btn-gray" style="margin-top:8px" onclick="document.getElementById('qrFotoInput').click()">
-      <i class="ti ti-photo"></i> Fotografar QR Code
+    <button class="btn btn-green" id="btnQR" onclick="document.getElementById('qrFotoInput').click()">
+      <i class="ti ti-qrcode"></i> Fotografar QR Code do cupom
     </button>
     <input type="file" id="qrFotoInput" accept="image/*" capture="environment" class="hidden" onchange="lerQRDeFoto(event)">
-    <div id="qrReader" style="margin-top:10px;display:none"></div>
+    <div id="qrReader" style="display:none"></div>
+    <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
+      <span class="spinner"></span> Buscando dados na SEFAZ...
+    </div>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
     <img id="cupomPreview" class="preview-img" alt="Cupom">
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
