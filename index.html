@@ -233,6 +233,17 @@
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
       <span class="spinner"></span> Lendo QR Code...
     </div>
+    <div id="cardChaveAcesso" class="hidden" style="margin-top:10px">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">
+        Cole a URL do QR Code ou a chave de acesso (44 dígitos) do cupom:
+      </div>
+      <div class="row-flex">
+        <input type="text" id="inputChaveAcesso" placeholder="https://www.nfce... ou 3526 0606 0572..." style="flex:1;font-size:12px">
+        <button class="btn btn-green btn-sm" style="width:auto" onclick="processarChaveManual()">
+          <i class="ti ti-arrow-right"></i>
+        </button>
+      </div>
+    </div>
     <input type="file" id="cupomInput" accept="image/*" capture="environment" class="hidden" onchange="processarCupom(event)">
     <img id="cupomPreview" class="preview-img" alt="Cupom">
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
@@ -869,13 +880,47 @@ function fazerScanNimiq(file) {
         tentarProxies(url);
       } else {
         toast('QR lido mas URL invalida: ' + url, 4000);
+        mostrarCampoManual();
       }
     })
     .catch(function(err) {
       hide('cupomProcessando');
       console.warn('QrScanner erro:', err);
-      toast('Nao consegui ler o QR. Tente com melhor iluminacao e foco.', 5000);
+      mostrarCampoManual();
     });
+}
+
+function mostrarCampoManual() {
+  show('cardChaveAcesso');
+  document.getElementById('inputChaveAcesso').focus();
+  toast('Nao consegui ler o QR. Cole a URL ou chave de acesso abaixo.', 4000);
+}
+
+function processarChaveManual() {
+  var v = document.getElementById('inputChaveAcesso').value.trim();
+  if (!v) { toast('Cole a URL ou chave de acesso'); return; }
+
+  var url = '';
+  // Se já é uma URL completa
+  if (v.startsWith('http')) {
+    url = v;
+  } else {
+    // Remove espaços da chave de acesso e monta a URL
+    var chave = v.replace(/\s/g, '');
+    if (chave.length >= 44 || v.length > 50) {
+      url = 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=' + chave + '|3|1';
+    } else {
+      toast('Chave inválida — deve ter 44 dígitos', 4000);
+      return;
+    }
+  }
+
+  hide('cardChaveAcesso');
+  document.getElementById('inputChaveAcesso').value = '';
+  document.getElementById('cupomProcessando').innerHTML =
+    '<span class="spinner"></span> Buscando dados na SEFAZ...';
+  show('cupomProcessando');
+  tentarProxies(url);
 }
 
 
