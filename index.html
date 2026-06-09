@@ -916,7 +916,7 @@ function parsearHtmlSefaz(html) {
 
   var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  // Estabelecimento — linha com nome da empresa (antes do CNPJ)
+  // Estabelecimento — linha antes do CNPJ
   for (var i = 0; i < Math.min(15, linhas.length); i++) {
     if (/^CNPJ/i.test(linhas[i])) {
       if (i > 0) r.estabelecimento = linhas[i-1];
@@ -931,58 +931,84 @@ function parsearHtmlSefaz(html) {
   else if (/cart.o de d.bito|debito/.test(txtL))     r.pagamento = 'Debito';
   else if (/dinheiro|esp.cie/.test(txtL))            r.pagamento = 'Dinheiro';
 
-  // Parser de itens — cada campo numa linha separada:
-  // NOME DO PRODUTO
-  // (Código:
-  // XXXXXX
-  // Qtde.:N
-  // UN: XX
-  // Vl. Unit.:
-  // X,XX
-  // Vl. Total
-  // X,XX
+  // Dois formatos possíveis:
+  // FORMATO A — tudo na mesma linha:
+  // "NOME (Código: XXXX)   Qtde.:1 UN: Un Vl. Unit.: X,XX  VL Total X,XX"
+  //
+  // FORMATO B — cada campo numa linha:
+  // "NOME"
+  // "(Código:"
+  // "XXXX"
+  // ")"
+  // "Qtde.:1"
+  // "UN: Un"
+  // "Vl. Unit.:"
+  // "X,XX"
+  // "Vl. Total"
+  // "X,XX"
 
-  var i = 0;
-  while (i < linhas.length) {
-    // Detecta início de produto — linha seguinte começa com "(Código:"
-    if (i + 1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[i+1])) {
-      var nome = linhas[i];
+  var ignorar = /^(CNPJ|CPF|Rua|Av\.|Total|Desconto|Troco|Forma|Cart|Data|Hora|Qtd\.|Valor|Inform|Emit|Amb|Prot|SAC|Atend|Tip|NFC|DANFE|DOC|AUX|CONS|Chave|Prot|Serie|Num|Vers)/i;
 
-      // Avança até achar Qtde.
-      var j = i + 2;
-      var qtd = '1 UN';
-      var valor = 0;
-
-      while (j < linhas.length && j < i + 15) {
-        // Qtde.:N
-        if (/^Qtde\.:([0-9,.]+)/i.test(linhas[j])) {
-          var mQtd = linhas[j].match(/^Qtde\.:([0-9,.]+)/i);
-          var num = mQtd[1].replace(',','.');
-          // Próxima linha tem unidade "UN: XX"
-          var uni = 'UN';
-          if (j+1 < linhas.length && /^(UN|Kg|Lt|Pc|Cx|G|ml|L):/i.test(linhas[j+1])) {
-            uni = linhas[j+1].split(':')[0].trim().toUpperCase();
-            if (uni === 'KG') uni = 'KG';
-          }
-          qtd = num + ' ' + uni;
-        }
-        // Vl. Total seguido pelo valor na linha seguinte
-        if (/^Vl\.\s*Total/i.test(linhas[j]) && j+1 < linhas.length) {
-          var vStr = linhas[j+1].replace(',','.');
-          valor = parseFloat(vStr) || 0;
-          j += 2;
-          break;
-        }
-        j++;
+  // Tenta FORMATO A primeiro — linha com "(Código:" e "Qtde." e "Total" juntos
+  var usouFormatoA = false;
+  for (var i = 0; i < linhas.length; i++) {
+    var l = linhas[i];
+    // Formato A: linha com Código + Qtde + Total tudo junto
+    var mA = l.match(/^(.+?)\s*\(C[oó]digo:[^)]+\).*?Qtde\.:(\S+)\s+UN:\s*(\S+).*?(?:VL|Vl\.?)\s*[Tt]otal\s+([0-9,.]+)/i);
+    if (mA) {
+      var nome  = mA[1].trim();
+      var num   = mA[2].replace(',','.');
+      var uni   = mA[3].toUpperCase();
+      var valor = parseFloat(mA[4].replace(',','.')) || 0;
+      if (nome.length > 2 && valor > 0 && !ignorar.test(nome)) {
+        r.itens.push({ produto: capNome(nome), quantidade: num + ' ' + uni, valor: valor });
+        usouFormatoA = true;
       }
-
-      if (nome.length > 2 && valor > 0 && !/^(CNPJ|CPF|Rua|Av\.|Total|Desconto|Troco|Forma|Cartao|Data|Hora|Qtd\.|Valor)/i.test(nome)) {
-        r.itens.push({ produto: capNome(nome), quantidade: qtd, valor: valor });
-      }
-      i = j;
       continue;
     }
-    i++;
+  }
+
+  // Se não achou nada no Formato A, tenta Formato B
+  if (r.itens.length === 0) {
+    var i = 0;
+    while (i < linhas.length) {
+      if (i + 1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[i+1])) {
+        var nome = linhas[i];
+        var qtd = '1 UN';
+        var valor = 0;
+        var j = i + 1;
+
+        while (j < linhas.length && j < i + 20) {
+          var l = linhas[j];
+          // Qtde.:N
+          if (/^Qtde\.:(\S+)/i.test(l)) {
+            var mQ = l.match(/^Qtde\.:(\S+)/i);
+            var num = mQ[1].replace(',','.');
+            var uni = 'UN';
+            if (j+1 < linhas.length && /^(UN|Kg|Lt|Pc|Cx|G|ml|L):/i.test(linhas[j+1])) {
+              uni = linhas[j+1].split(':')[0].trim().toUpperCase();
+              j++;
+            }
+            qtd = num + ' ' + uni;
+          }
+          // Vl. Total — valor na próxima linha
+          if (/^Vl\.\s*Total/i.test(l) && j+1 < linhas.length) {
+            valor = parseFloat(linhas[j+1].replace(',','.')) || 0;
+            j += 2; break;
+          }
+          // Próximo produto
+          if (j > i+2 && j+1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[j+1])) break;
+          j++;
+        }
+
+        if (nome.length > 2 && valor > 0 && !ignorar.test(nome)) {
+          r.itens.push({ produto: capNome(nome), quantidade: qtd, valor: valor });
+        }
+        i = j;
+        continue;
+      }
+      i++;
+    }
   }
 
   return r;
