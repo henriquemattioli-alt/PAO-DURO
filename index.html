@@ -911,68 +911,75 @@ function tentarProxies(urlSefaz) {
 
 function parsearHtmlSefaz(html) {
   var doc = new DOMParser().parseFromString(html, 'text/html');
-  var txt = doc.body ? doc.body.innerText || doc.body.textContent : html;
+  var txt = doc.body ? doc.body.textContent : html;
   var r = { estabelecimento: '', pagamento: '', itens: [] };
 
-  var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 1; });
+  var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  // Estabelecimento — primeiras linhas antes do CNPJ
-  for (var i = 0; i < Math.min(8, linhas.length); i++) {
-    if (/CNPJ/i.test(linhas[i])) break;
-    if (linhas[i].length > 3 && !/NFC|DANFE|DOCUMENTO|AUXILIAR|NOTA|FISCAL|CONSUMIDOR|ELETR/i.test(linhas[i])) {
-      r.estabelecimento = linhas[i]; break;
+  // Estabelecimento — linha com nome da empresa (antes do CNPJ)
+  for (var i = 0; i < Math.min(15, linhas.length); i++) {
+    if (/^CNPJ/i.test(linhas[i])) {
+      if (i > 0) r.estabelecimento = linhas[i-1];
+      break;
     }
   }
 
   // Pagamento
   var txtL = txt.toLowerCase();
-  if (/\bpix\b/.test(txtL))                       r.pagamento = 'Pix';
-  else if (/cart.o de cr.dito|credito/.test(txtL))  r.pagamento = 'Credito';
-  else if (/cart.o de d.bito|debito/.test(txtL))    r.pagamento = 'Debito';
-  else if (/dinheiro|esp.cie/.test(txtL))           r.pagamento = 'Dinheiro';
+  if (/\bpix\b/.test(txtL))                        r.pagamento = 'Pix';
+  else if (/cart.o de cr.dito|credito/.test(txtL))   r.pagamento = 'Credito';
+  else if (/cart.o de d.bito|debito/.test(txtL))     r.pagamento = 'Debito';
+  else if (/dinheiro|esp.cie/.test(txtL))            r.pagamento = 'Dinheiro';
 
-  // Parser de itens — formato SEFAZ-SP:
-  // Linha 1: "NOME DO PRODUTO (Codigo: XXXXXX ) Vl. Total"
-  // Linha 2: "Qtde.:N UN: XX Vl. Unit.: X,XX   X,XX"
+  // Parser de itens — cada campo numa linha separada:
+  // NOME DO PRODUTO
+  // (Código:
+  // XXXXXX
+  // Qtde.:N
+  // UN: XX
+  // Vl. Unit.:
+  // X,XX
+  // Vl. Total
+  // X,XX
+
   var i = 0;
   while (i < linhas.length) {
-    var linha = linhas[i];
+    // Detecta início de produto — linha seguinte começa com "(Código:"
+    if (i + 1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[i+1])) {
+      var nome = linhas[i];
 
-    // Detecta linha de produto — tem "(Codigo:" ou "Código:"
-    var mProd = linha.match(/^(.+?)\s*\(C[oó]digo:/i);
-    if (mProd) {
-      var nome = mProd[1].trim();
-
-      // Próxima linha deve ter Qtde e valor
+      // Avança até achar Qtde.
+      var j = i + 2;
       var qtd = '1 UN';
       var valor = 0;
 
-      if (i + 1 < linhas.length) {
-        var proxLinha = linhas[i + 1];
-
-        // Extrai quantidade: "Qtde.:1 UN:" ou "Qtde.:0,464 Kg:"
-        var mQtd = proxLinha.match(/Qtde\.:([0-9,.]+)\s*(UN|Kg|Lt|Pc|Cx|G|ml|L)?/i);
-        if (mQtd) {
+      while (j < linhas.length && j < i + 15) {
+        // Qtde.:N
+        if (/^Qtde\.:([0-9,.]+)/i.test(linhas[j])) {
+          var mQtd = linhas[j].match(/^Qtde\.:([0-9,.]+)/i);
           var num = mQtd[1].replace(',','.');
-          var uni = (mQtd[2] || 'UN').toUpperCase();
-          if (uni === 'KG') uni = 'KG';
+          // Próxima linha tem unidade "UN: XX"
+          var uni = 'UN';
+          if (j+1 < linhas.length && /^(UN|Kg|Lt|Pc|Cx|G|ml|L):/i.test(linhas[j+1])) {
+            uni = linhas[j+1].split(':')[0].trim().toUpperCase();
+            if (uni === 'KG') uni = 'KG';
+          }
           qtd = num + ' ' + uni;
         }
-
-        // Extrai valor — último número da linha
-        var nums = proxLinha.match(/([0-9]+,[0-9]{2})(?=[^0-9]|$)/g);
-        if (nums && nums.length > 0) {
-          valor = parseFloat(nums[nums.length - 1].replace(',','.'));
+        // Vl. Total seguido pelo valor na linha seguinte
+        if (/^Vl\.\s*Total/i.test(linhas[j]) && j+1 < linhas.length) {
+          var vStr = linhas[j+1].replace(',','.');
+          valor = parseFloat(vStr) || 0;
+          j += 2;
+          break;
         }
-
-        i += 2; // pula as duas linhas
-      } else {
-        i++;
+        j++;
       }
 
-      if (nome.length > 2 && valor > 0) {
+      if (nome.length > 2 && valor > 0 && !/^(CNPJ|CPF|Rua|Av\.|Total|Desconto|Troco|Forma|Cartao|Data|Hora|Qtd\.|Valor)/i.test(nome)) {
         r.itens.push({ produto: capNome(nome), quantidade: qtd, valor: valor });
       }
+      i = j;
       continue;
     }
     i++;
