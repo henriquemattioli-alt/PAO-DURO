@@ -294,6 +294,45 @@
     </div>
   </div>
 
+  <!-- CARD: ENTRADA MANUAL -->
+  <div class="card" id="cardEntradaManual">
+    <div class="card-title"><i class="ti ti-pencil"></i> Entrada manual de itens</div>
+    <button class="btn btn-gray" id="btnVoz" onclick="alternarVoz()">
+      <i class="ti ti-microphone" id="iconeVoz"></i> <span id="textoVoz">Lançar por voz</span>
+    </button>
+    <div id="vozStatusDiv" class="hidden" style="margin-top:6px;font-size:12px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--bg2)">
+      <span id="vozStatusTxt"></span>
+    </div>
+    <hr class="divider" style="margin:10px 0">
+    <div class="field">
+      <label>Produto</label>
+      <input type="text" id="manProduto" placeholder="Nome do produto" autocomplete="off">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div class="field">
+        <label>Quantidade</label>
+        <input type="number" id="manQtd" placeholder="1" min="0" step="0.001" value="1">
+      </div>
+      <div class="field">
+        <label>Unidade</label>
+        <select id="manUni">
+          <option value="UN">UN</option>
+          <option value="KG">KG</option>
+          <option value="G">G</option>
+          <option value="L">L</option>
+          <option value="ML">ML</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Preço R$</label>
+        <input type="number" id="manPreco" placeholder="0,00" min="0" step="0.01">
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="adicionarItemManualForm()">
+      <i class="ti ti-plus"></i> Adicionar item
+    </button>
+  </div>
+
   <!-- CARD: ITENS -->
   <div class="card hidden" id="cardItens">
     <div class="card-title"><i class="ti ti-list"></i> Itens — edite os nomes se necessário</div>
@@ -1229,6 +1268,191 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
     if (urlOriginal) window.open(urlOriginal, '_blank');
     show('cardItens'); show('cardExport'); atualizarTotais();
   }
+}
+
+
+// ─── ENTRADA MANUAL + VOZ ─────────────────────────────────────────────────────
+var vozAtivo = false;
+var vozRec = null;
+var vozCampo = null;
+var vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
+
+function adicionarItemManualForm() {
+  var produto = document.getElementById('manProduto').value.trim();
+  var qtd     = document.getElementById('manQtd').value.trim() || '1';
+  var uni     = document.getElementById('manUni').value;
+  var preco   = parseFloat(document.getElementById('manPreco').value) || 0;
+  if (!produto) { toast('Informe o nome do produto'); return; }
+  if (!preco)   { toast('Informe o preço'); return; }
+  state.itens.push({ produto: produto, quantidade: qtd + ' ' + uni, valor: preco });
+  save(); renderItens(); atualizarTotais();
+  show('cardItens'); show('cardExport');
+  // Limpa campos para próximo item
+  document.getElementById('manProduto').value = '';
+  document.getElementById('manQtd').value = '1';
+  document.getElementById('manPreco').value = '';
+  document.getElementById('manProduto').focus();
+  toast('✓ ' + produto + ' adicionado!');
+}
+
+function alternarVoz() {
+  if (vozAtivo) { pararVoz(); } else { iniciarVoz(); }
+}
+
+function iniciarVoz() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    toast('Reconhecimento de voz não disponível. Use Chrome ou Brave.'); return;
+  }
+  vozAtivo = true;
+  vozCampo = null;
+  vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
+  document.getElementById('iconeVoz').className = 'ti ti-microphone-off';
+  document.getElementById('textoVoz').textContent = 'Parar voz';
+  setVozStatus('info', 'Diga: PRODUTO, QUANTIDADE, UNIDADE, PREÇO, ADICIONAR ou PRONTO');
+  show('vozStatusDiv');
+  show('cardItens'); show('cardExport'); atualizarTotais();
+  escutarVoz();
+}
+
+function pararVoz() {
+  vozAtivo = false; vozCampo = null;
+  if (vozRec) { try { vozRec.stop(); } catch(e) {} vozRec = null; }
+  document.getElementById('iconeVoz').className = 'ti ti-microphone';
+  document.getElementById('textoVoz').textContent = 'Lançar por voz';
+  hide('vozStatusDiv');
+}
+
+function setVozStatus(tipo, msg) {
+  var el = document.getElementById('vozStatusTxt');
+  el.textContent = msg;
+  var div = document.getElementById('vozStatusDiv');
+  div.style.color = tipo === 'ok' ? 'var(--green)' : tipo === 'warn' ? 'var(--amber)' : 'var(--text2)';
+}
+
+function escutarVoz() {
+  if (!vozAtivo) return;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  vozRec = new SR();
+  vozRec.lang = 'pt-BR';
+  vozRec.continuous = false;
+  vozRec.interimResults = false;
+  vozRec.onresult = function(ev) {
+    var txt = ev.results[0][0].transcript.trim();
+    setVozStatus('info', '"' + txt + '"');
+    processarFalaVoz(txt);
+  };
+  vozRec.onerror = function(e) {
+    if (vozAtivo) setTimeout(escutarVoz, e.error === 'no-speech' ? 200 : 1000);
+  };
+  vozRec.onend = function() { if (vozAtivo) setTimeout(escutarVoz, 200); };
+  vozRec.start();
+}
+
+function normVoz(txt) {
+  return txt.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
+function processarFalaVoz(txt) {
+  var n = normVoz(txt);
+
+  // Palavras-chave
+  if (n === 'produto' || n.endsWith(' produto')) {
+    vozCampo = 'produto';
+    setVozStatus('info', 'Diga o nome do produto...');
+    return;
+  }
+  if (n === 'quantidade' || n === 'qtd') {
+    vozCampo = 'quantidade';
+    setVozStatus('info', 'Diga o número...');
+    return;
+  }
+  if (['unidade','unidades','gramas','grama','kg','quilo','quilos','litro','litros','ml','mililitros'].indexOf(n) >= 0) {
+    processarUnidadeVoz(n); return;
+  }
+  if (n === 'preco' || n === 'valor' || n === 'preço') {
+    vozCampo = 'preco';
+    setVozStatus('info', 'Diga o preço...');
+    return;
+  }
+  if (n.includes('adicionar') || n.includes('proximo') || n.includes('próximo')) {
+    adicionarItemVoz(); return;
+  }
+  if (n.includes('pronto') || n.includes('finalizar') || n.includes('terminar')) {
+    if (vozItem.produto && vozItem.preco) adicionarItemVoz();
+    pararVoz();
+    toast('Entrada por voz concluída!');
+    return;
+  }
+
+  // Captura por campo
+  if (vozCampo === 'produto') {
+    vozItem.produto = txt.charAt(0).toUpperCase() + txt.slice(1);
+    document.getElementById('manProduto').value = vozItem.produto;
+    setVozStatus('ok', '✓ Produto: "' + vozItem.produto + '" — diga PREÇO');
+    vozCampo = null; return;
+  }
+  if (vozCampo === 'quantidade') {
+    vozItem.qtd = extrairNumeroVoz(n);
+    document.getElementById('manQtd').value = vozItem.qtd;
+    setVozStatus('ok', '✓ Qtd: ' + vozItem.qtd + ' — diga UNIDADE');
+    vozCampo = 'aguardando_uni'; return;
+  }
+  if (vozCampo === 'aguardando_uni') {
+    processarUnidadeVoz(n); return;
+  }
+  if (vozCampo === 'preco') {
+    var v = extrairValorVoz(txt);
+    vozItem.preco = v;
+    document.getElementById('manPreco').value = v.replace('R$','').replace(',','.').trim();
+    setVozStatus('ok', '✓ Preço: ' + v + ' — diga ADICIONAR ou PRODUTO');
+    vozCampo = null; return;
+  }
+
+  setVozStatus('warn', 'Não entendi: "' + txt + '" — diga PRODUTO, PREÇO, QUANTIDADE ou ADICIONAR');
+}
+
+function processarUnidadeVoz(n) {
+  var sigla = 'UN';
+  if (n.includes('grama')) sigla = 'G';
+  else if (n.includes('kg') || n.includes('quilo')) sigla = 'KG';
+  else if (n.includes('litro')) sigla = 'L';
+  else if (n.includes('mililitro') || n === 'ml') sigla = 'ML';
+  vozItem.uni = sigla;
+  document.getElementById('manUni').value = sigla;
+  setVozStatus('ok', '✓ Unidade: ' + sigla + ' — diga PREÇO');
+  vozCampo = null;
+}
+
+function extrairNumeroVoz(n) {
+  var m = n.match(/(\d+)[,.]( \d+)/); if (m) return m[1] + '.' + m[2].trim();
+  m = n.match(/\d+/); if (m) return m[0];
+  var ext = {'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'cem':100};
+  var partes = n.split(/\s+/), soma = 0, ok = false;
+  partes.forEach(function(p) { if (ext[p] !== undefined) { soma += ext[p]; ok = true; } });
+  return ok ? String(soma) : '1';
+}
+
+function extrairValorVoz(txt) {
+  var n = txt.toLowerCase().replace(/reais|real/g,'').replace(/virgula|vírgula/g,',').trim();
+  var m = n.match(/(\d+)[,.]( \d{1,2})/); if (m) return 'R$ ' + m[1] + ',' + m[2].trim().padEnd(2,'0');
+  m = n.match(/(\d+)/); if (m) return 'R$ ' + m[1] + ',00';
+  return txt;
+}
+
+function adicionarItemVoz() {
+  if (!vozItem.produto) { setVozStatus('warn', 'Informe o PRODUTO primeiro'); return; }
+  if (!vozItem.preco)   { setVozStatus('warn', 'Informe o PREÇO primeiro'); return; }
+  var valor = parseFloat(vozItem.preco.replace('R$','').replace(',','.').trim()) || 0;
+  state.itens.push({ produto: vozItem.produto, quantidade: vozItem.qtd + ' ' + vozItem.uni, valor: valor });
+  save(); renderItens(); atualizarTotais();
+  show('cardItens'); show('cardExport');
+  toast('✓ ' + vozItem.produto + ' adicionado!');
+  vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
+  document.getElementById('manProduto').value = '';
+  document.getElementById('manQtd').value = '1';
+  document.getElementById('manPreco').value = '';
+  setVozStatus('info', 'Adicionado! Diga PRODUTO para o próximo ou PRONTO');
+  vozCampo = null;
 }
 
 load();
