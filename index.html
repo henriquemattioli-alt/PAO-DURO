@@ -191,8 +191,9 @@
     </div>
     <div id="manualEstab" class="hidden" style="margin-top:8px">
       <div class="field">
-        <label>Estabelecimentos salvos</label>
-        <select id="estabSelect" onchange="estabSelecionado()"></select>
+        <label>Buscar estabelecimento</label>
+        <input type="text" id="estabBusca" placeholder="Digite para filtrar..." oninput="filtrarEstabs(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
+        <div id="estabLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none"></div>
       </div>
       <div class="field">
         <label>Ou informe manualmente</label>
@@ -360,14 +361,40 @@ function show(id) { document.getElementById(id).classList.remove('hidden'); }
 function hide(id) { document.getElementById(id).classList.add('hidden'); }
 
 // ─── ESTABELECIMENTO ──────────────────────────────────────────────────────────
+function capEstab(txt) {
+  return txt.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+}
+
 function populateEstabSelect() {
-  var sel = document.getElementById('estabSelect');
-  sel.innerHTML = '<option value="">Selecione ou digite abaixo...</option>';
-  state.estabs.forEach(function(e) {
-    var o = document.createElement('option');
-    o.value = o.textContent = e;
-    sel.appendChild(o);
+  filtrarEstabs('');
+}
+
+function filtrarEstabs(q) {
+  var lista = document.getElementById('estabLista');
+  var norm = q.toLowerCase().trim();
+  var filtrados = norm
+    ? state.estabs.filter(function(e) { return e.toLowerCase().includes(norm); })
+    : state.estabs;
+  if (filtrados.length === 0) { lista.style.display = 'none'; return; }
+  lista.style.display = 'block';
+  lista.innerHTML = '';
+  filtrados.forEach(function(e) {
+    var cap = capEstab(e);
+    var div = document.createElement('div');
+    div.textContent = cap;
+    div.style.cssText = 'padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)';
+    div.addEventListener('click', function() { selecionarEstabLista(e); });
+    div.addEventListener('mouseenter', function() { this.style.background = 'var(--bg2)'; });
+    div.addEventListener('mouseleave', function() { this.style.background = ''; });
+    lista.appendChild(div);
   });
+}
+
+function selecionarEstabLista(nome) {
+  var cap = capEstab(nome);
+  document.getElementById('estabManual').value = cap;
+  document.getElementById('estabBusca').value = cap;
+  document.getElementById('estabLista').style.display = 'none';
 }
 
 function importarEstabs(e) {
@@ -380,7 +407,8 @@ function importarEstabs(e) {
       var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
       // Ignora cabeçalho (primeira linha se for texto sem números)
       if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
-      if (nome && !state.estabs.includes(nome)) { state.estabs.push(nome); count++; }
+      var nomeCap = nome.toLowerCase().replace(/(?:^|\s)\S/g, function(a){return a.toUpperCase();});
+      if (nomeCap && !state.estabs.includes(nomeCap)) { state.estabs.push(nomeCap); count++; }
     });
     localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
     populateEstabSelect();
@@ -390,10 +418,7 @@ function importarEstabs(e) {
   reader.readAsText(file, 'UTF-8');
 }
 
-function estabSelecionado() {
-  var v = document.getElementById('estabSelect').value;
-  if (v) document.getElementById('estabManual').value = v;
-}
+function estabSelecionado() {}
 
 function detectarLocal() {
   setGpsStatus('info', 'Obtendo localização...');
