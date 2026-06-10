@@ -1136,14 +1136,14 @@ function parsearHtmlSefaz(html) {
   // "Vl. Total"
   // "X,XX"
 
-  var ignorar = /^(CNPJ|CPF|Rua|Av\.|Total|Desconto|Troco|Forma|Cart|Data|Hora|Qtd\.|Valor|Inform|Emit|Amb|Prot|SAC|Atend|Tip|NFC|DANFE|DOC|AUX|CONS|Chave|Prot|Serie|Num|Vers)/i;
+  var ignorar = /^(CNPJ|CPF|Rua|Av\.|Total|Desconto|Troco|Forma|Cart|Data|Hora|Qtd\.|Valor|Inform|Emit|Amb|Prot|Atend|Tip|NFC|DANFE|DOC|AUX|CONS|Chave|Serie|Num|Vers)/i;
 
   // Tenta FORMATO A primeiro — linha com "(Código:" e "Qtde." e "Total" juntos
   var usouFormatoA = false;
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
     // Formato A: linha com Código + Qtde + Total tudo junto
-    var mA = l.match(/^(.+?)\s*\(C[oó]digo:[^)]+\).*?Qtde\.:(\S+)\s+UN:\s*(\S+).*?(?:VL|Vl\.?)\s*[Tt]otal\s+([0-9]+[.,][0-9]{1,2})/i);
+    var mA = l.match(/^(.+?)\s*\(C[oó]digo:[^)]*\).*?Qtde\.:(\S+)\s+UN:\s*(\S+).*?(?:VL|Vl\.?)\s*[Tt]otal\s+([0-9]+[.,][0-9]+)/i);
     if (mA) {
       var nome  = mA[1].trim();
       var num   = mA[2].replace(',','.');
@@ -1157,8 +1157,8 @@ function parsearHtmlSefaz(html) {
     }
   }
 
-  // Se não achou nada no Formato A, tenta Formato B
-  if (r.itens.length === 0) {
+  // Formato B — complementa o Formato A para pegar itens que ficaram para trás
+  {
     var i = 0;
     while (i < linhas.length) {
       if (i + 1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[i+1])) {
@@ -1167,7 +1167,7 @@ function parsearHtmlSefaz(html) {
         var valor = 0;
         var j = i + 1;
 
-        while (j < linhas.length && j < i + 20) {
+        while (j < linhas.length && j < i + 30) {
           var l = linhas[j];
           // Qtde.:N
           if (/^Qtde\.:(\S+)/i.test(l)) {
