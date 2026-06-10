@@ -1298,6 +1298,33 @@ var vozRec = null;
 var vozAguardandoIgual = false; // true quando ouviu palavra-chave e aguarda "IGUAL"
 var vozCampoAtual = null;       // campo que será preenchido após "IGUAL"
 
+function filtrarProdutos(q) {
+  var lista = document.getElementById('produtosLista');
+  // Normaliza removendo acentos para busca
+  var normQ = q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  if (!normQ || normQ.length < 2) { lista.style.display = 'none'; return; }
+  var filtrados = state.produtos.filter(function(p) {
+    var normP = p.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    return normP.includes(normQ);
+  }).slice(0, 30);
+  if (filtrados.length === 0) { lista.style.display = 'none'; return; }
+  lista.style.display = 'block';
+  lista.innerHTML = '';
+  filtrados.forEach(function(p) {
+    var div = document.createElement('div');
+    div.textContent = p;
+    div.style.cssText = 'padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)';
+    div.addEventListener('click', function() {
+      document.getElementById('manProduto').value = p;
+      lista.style.display = 'none';
+      document.getElementById('manPreco').focus();
+    });
+    div.addEventListener('mouseenter', function() { this.style.background = 'var(--bg2)'; });
+    div.addEventListener('mouseleave', function() { this.style.background = ''; });
+    lista.appendChild(div);
+  });
+}
+
 function adicionarItemManualForm() {
   var produto = document.getElementById('manProduto').value.trim();
   var qtd     = document.getElementById('manQtd').value.trim() || '1';
@@ -1544,4 +1571,3 @@ load();
 </script>
 </body>
 </html>
-
