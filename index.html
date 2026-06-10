@@ -796,27 +796,55 @@ function atualizarTotais() {
 }
 
 // ─── EXPORTAR CSV LOCAL ───────────────────────────────────────────────────────
-function exportarCSV() {
-  if (!state.estab) { toast('Informe o estabelecimento'); return; }
-  if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
-  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
-  var hoje = new Date().toLocaleDateString('pt-BR');
+function gerarCSV(callback) {
+  var agora = new Date();
+  var data  = agora.toLocaleDateString('pt-BR');
+  var hora  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   var header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
   var rows = state.itens.map(function(it) {
     var valorStr = it.valor < 0
       ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
       : it.valor.toFixed(2).replace('.', ',');
-    return hoje + ';' + it.produto + ';' + it.quantidade + ';' +
+    return data + ';' + it.produto + ';' + it.quantidade + ';' +
            valorStr + ';' + state.estab + ';' + state.pgto;
   });
-  var csv = [header].concat(rows).join('\r\n');
-  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  toast('CSV exportado com sucesso!');
+  function montar(lat, lon) {
+    var coordStr = (lat !== null) ? lat.toFixed(6) + ';' + lon.toFixed(6) : ';';
+    var meta = data + ';' + hora + ';' + coordStr;
+    return [meta, header].concat(rows).join('\r\n');
+  }
+  if (navigator.geolocation) {
+    var done = false;
+    var timer = setTimeout(function() {
+      if (!done) { done = true; callback(montar(null, null)); }
+    }, 3000);
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      if (!done) {
+        done = true; clearTimeout(timer);
+        callback(montar(pos.coords.latitude, pos.coords.longitude));
+      }
+    }, function() {
+      if (!done) { done = true; clearTimeout(timer); callback(montar(null, null)); }
+    }, { timeout: 3000, maximumAge: 60000 });
+  } else {
+    callback(montar(null, null));
+  }
+}
+
+function exportarCSV() {
+  if (!state.estab) { toast('Informe o estabelecimento'); return; }
+  if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+  var hoje = new Date().toLocaleDateString('pt-BR');
+  gerarCSV(function(csv) {
+    var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('CSV exportado com sucesso!');
+  });
 }
 
 // ─── GOOGLE DRIVE ─────────────────────────────────────────────────────────────
@@ -844,18 +872,11 @@ function exportarDrive() {
   if (!clientId) { show('cardDrive'); return; }
 
   var hoje = new Date().toLocaleDateString('pt-BR');
-  var header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
-  var rows = state.itens.map(function(it) {
-    var valorStr = it.valor < 0
-      ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
-      : it.valor.toFixed(2).replace('.', ',');
-    return hoje + ';' + it.produto + ';' + it.quantidade + ';' +
-           valorStr + ';' + state.estab + ';' + state.pgto;
-  });
-  drivePendingCSV  = [header].concat(rows).join('\r\n');
   drivePendingFile = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
-
-  iniciarDrive(clientId);
+  gerarCSV(function(csv) {
+    drivePendingCSV = csv;
+    iniciarDrive(clientId);
+  });
 }
 
 function iniciarDrive(clientId) {
