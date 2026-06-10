@@ -297,16 +297,22 @@
   <!-- CARD: ENTRADA MANUAL -->
   <div class="card" id="cardEntradaManual">
     <div class="card-title"><i class="ti ti-pencil"></i> Entrada manual de itens</div>
-    <button class="btn btn-gray" id="btnVoz" onclick="alternarVoz()">
+    <button class="btn btn-gray" id="btnVoz" onclick="alternarVoz()" style="transition:all .3s">
       <i class="ti ti-microphone" id="iconeVoz"></i> <span id="textoVoz">Lançar por voz</span>
     </button>
-    <div id="vozStatusDiv" class="hidden" style="margin-top:6px;font-size:12px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--bg2)">
-      <span id="vozStatusTxt"></span>
+    <div id="vozStatusDiv" class="hidden" style="margin-top:8px;font-size:13px;padding:8px 12px;border-radius:var(--radius-sm);background:var(--bg2);border-left:3px solid var(--green)">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:2px" id="vozCampoAtualDiv"></div>
+      <span id="vozStatusTxt">Aguardando...</span>
     </div>
+    <style>
+      @keyframes pulsar { 0%,100%{box-shadow:0 0 0 0 rgba(99,153,34,0.4)} 50%{box-shadow:0 0 0 8px rgba(99,153,34,0)} }
+      .voz-ativo { animation: pulsar 1.2s infinite; background: var(--green-light) !important; border-color: var(--green-mid) !important; color: var(--green) !important; }
+    </style>
     <hr class="divider" style="margin:10px 0">
     <div class="field">
       <label>Produto</label>
-      <input type="text" id="manProduto" placeholder="Nome do produto" autocomplete="off">
+      <input type="text" id="manProduto" placeholder="Digite para buscar..." oninput="filtrarProdutos(this.value)" autocomplete="off">
+      <div id="produtosLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none;margin-top:4px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <div class="field">
@@ -383,7 +389,8 @@
 var state = {
   estab: '', cidade: '', pgto: '', itens: [],
   estabs: JSON.parse(localStorage.getItem('pd_estabs') || '[]'),
-  pgtos: JSON.parse(localStorage.getItem('pd_pgtos') || '[]')
+  pgtos: JSON.parse(localStorage.getItem('pd_pgtos') || '[]'),
+  produtos: JSON.parse(localStorage.getItem('pd_produtos') || '[]')
 };
 
 // ─── PERSISTÊNCIA ─────────────────────────────────────────────────────────────
@@ -416,6 +423,19 @@ function carregarCSVsGitHub() {
       }
     })
     .catch(function(e) { console.log('estabs.CSV:', e.message); });
+
+  // Carrega produtos
+  fetch(BASE_URL + 'Produtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('Produtos.csv nao encontrado'); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) {
+        state.produtos = novos;
+        localStorage.setItem('pd_produtos', JSON.stringify(state.produtos));
+        console.log('Produtos.csv carregado:', novos.length, 'itens');
+      }
+    })
+    .catch(function(e) { console.log('Produtos.csv:', e.message); });
 
   // Carrega formas de pagamento
   fetch(BASE_URL + 'pagtos.CSV?v=' + Date.now())
@@ -1275,8 +1295,8 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
 // ─── ENTRADA MANUAL + VOZ ─────────────────────────────────────────────────────
 var vozAtivo = false;
 var vozRec = null;
-var vozCampo = null;
-var vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
+var vozAguardandoIgual = false; // true quando ouviu palavra-chave e aguarda "IGUAL"
+var vozCampoAtual = null;       // campo que será preenchido após "IGUAL"
 
 function adicionarItemManualForm() {
   var produto = document.getElementById('manProduto').value.trim();
@@ -1288,10 +1308,10 @@ function adicionarItemManualForm() {
   state.itens.push({ produto: produto, quantidade: qtd + ' ' + uni, valor: preco });
   save(); renderItens(); atualizarTotais();
   show('cardItens'); show('cardExport');
-  // Limpa campos para próximo item
   document.getElementById('manProduto').value = '';
   document.getElementById('manQtd').value = '1';
   document.getElementById('manPreco').value = '';
+  document.getElementById('produtosLista').style.display = 'none';
   document.getElementById('manProduto').focus();
   toast('✓ ' + produto + ' adicionado!');
 }
@@ -1305,29 +1325,34 @@ function iniciarVoz() {
     toast('Reconhecimento de voz não disponível. Use Chrome ou Brave.'); return;
   }
   vozAtivo = true;
-  vozCampo = null;
-  vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
-  document.getElementById('iconeVoz').className = 'ti ti-microphone-off';
+  vozAguardandoIgual = false;
+  vozCampoAtual = null;
+  document.getElementById('btnVoz').classList.add('voz-ativo');
+  document.getElementById('iconeVoz').className = 'ti ti-microphone';
   document.getElementById('textoVoz').textContent = 'Parar voz';
-  setVozStatus('info', 'Diga: PRODUTO, QUANTIDADE, UNIDADE, PREÇO, ADICIONAR ou PRONTO');
   show('vozStatusDiv');
-  show('cardItens'); show('cardExport'); atualizarTotais();
+  setVozStatus('Diga: PRODUTO, QUANTIDADE, UNIDADE ou PREÇO');
+  setVozCampo('');
   escutarVoz();
 }
 
 function pararVoz() {
-  vozAtivo = false; vozCampo = null;
+  vozAtivo = false;
+  vozAguardandoIgual = false;
+  vozCampoAtual = null;
   if (vozRec) { try { vozRec.stop(); } catch(e) {} vozRec = null; }
+  document.getElementById('btnVoz').classList.remove('voz-ativo');
   document.getElementById('iconeVoz').className = 'ti ti-microphone';
   document.getElementById('textoVoz').textContent = 'Lançar por voz';
   hide('vozStatusDiv');
 }
 
-function setVozStatus(tipo, msg) {
-  var el = document.getElementById('vozStatusTxt');
-  el.textContent = msg;
-  var div = document.getElementById('vozStatusDiv');
-  div.style.color = tipo === 'ok' ? 'var(--green)' : tipo === 'warn' ? 'var(--amber)' : 'var(--text2)';
+function setVozStatus(msg) {
+  document.getElementById('vozStatusTxt').textContent = msg;
+}
+
+function setVozCampo(msg) {
+  document.getElementById('vozCampoAtualDiv').textContent = msg;
 }
 
 function escutarVoz() {
@@ -1336,16 +1361,37 @@ function escutarVoz() {
   vozRec = new SR();
   vozRec.lang = 'pt-BR';
   vozRec.continuous = false;
-  vozRec.interimResults = false;
+  vozRec.interimResults = true;
+  vozRec.maxAlternatives = 3;
+
   vozRec.onresult = function(ev) {
-    var txt = ev.results[0][0].transcript.trim();
-    setVozStatus('info', '"' + txt + '"');
-    processarFalaVoz(txt);
+    var interim = '', final = '';
+    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+      var t = ev.results[i][0].transcript.trim();
+      if (ev.results[i].isFinal) final = t;
+      else interim = t;
+    }
+    // Mostra o que está ouvindo em tempo real
+    if (interim) setVozStatus('🎤 ' + interim + '...');
+    if (final) {
+      setVozStatus('🎤 "' + final + '"');
+      processarFalaVoz(final);
+    }
   };
+
   vozRec.onerror = function(e) {
-    if (vozAtivo) setTimeout(escutarVoz, e.error === 'no-speech' ? 200 : 1000);
+    if (e.error === 'no-speech') {
+      if (vozAtivo) setTimeout(escutarVoz, 100);
+    } else {
+      setVozStatus('Erro: ' + e.error + ' — toque para tentar novamente');
+      pararVoz();
+    }
   };
-  vozRec.onend = function() { if (vozAtivo) setTimeout(escutarVoz, 200); };
+
+  vozRec.onend = function() {
+    if (vozAtivo) setTimeout(escutarVoz, 100);
+  };
+
   vozRec.start();
 }
 
@@ -1356,105 +1402,143 @@ function normVoz(txt) {
 function processarFalaVoz(txt) {
   var n = normVoz(txt);
 
-  // Palavras-chave
-  if (n === 'produto' || n.endsWith(' produto')) {
-    vozCampo = 'produto';
-    setVozStatus('info', 'Diga o nome do produto...');
-    return;
-  }
-  if (n === 'quantidade' || n === 'qtd') {
-    vozCampo = 'quantidade';
-    setVozStatus('info', 'Diga o número...');
-    return;
-  }
-  if (['unidade','unidades','gramas','grama','kg','quilo','quilos','litro','litros','ml','mililitros'].indexOf(n) >= 0) {
-    processarUnidadeVoz(n); return;
-  }
-  if (n === 'preco' || n === 'valor' || n === 'preço') {
-    vozCampo = 'preco';
-    setVozStatus('info', 'Diga o preço...');
-    return;
-  }
-  if (n.includes('adicionar') || n.includes('proximo') || n.includes('próximo')) {
-    adicionarItemVoz(); return;
-  }
+  // Detecta PRONTO/FINALIZAR
   if (n.includes('pronto') || n.includes('finalizar') || n.includes('terminar')) {
-    if (vozItem.produto && vozItem.preco) adicionarItemVoz();
+    var prod = document.getElementById('manProduto').value.trim();
+    var preco = parseFloat(document.getElementById('manPreco').value) || 0;
+    if (prod && preco) adicionarItemManualForm();
     pararVoz();
     toast('Entrada por voz concluída!');
     return;
   }
 
-  // Captura por campo
-  if (vozCampo === 'produto') {
-    vozItem.produto = txt.charAt(0).toUpperCase() + txt.slice(1);
-    document.getElementById('manProduto').value = vozItem.produto;
-    setVozStatus('ok', '✓ Produto: "' + vozItem.produto + '" — diga PREÇO');
-    vozCampo = null; return;
-  }
-  if (vozCampo === 'quantidade') {
-    vozItem.qtd = extrairNumeroVoz(n);
-    document.getElementById('manQtd').value = vozItem.qtd;
-    setVozStatus('ok', '✓ Qtd: ' + vozItem.qtd + ' — diga UNIDADE');
-    vozCampo = 'aguardando_uni'; return;
-  }
-  if (vozCampo === 'aguardando_uni') {
-    processarUnidadeVoz(n); return;
-  }
-  if (vozCampo === 'preco') {
-    var v = extrairValorVoz(txt);
-    vozItem.preco = v;
-    document.getElementById('manPreco').value = v.replace('R$','').replace(',','.').trim();
-    setVozStatus('ok', '✓ Preço: ' + v + ' — diga ADICIONAR ou PRODUTO');
-    vozCampo = null; return;
+  // Detecta ADICIONAR/PRÓXIMO
+  if (n.includes('adicionar') || n.includes('proximo') || n.includes('próximo')) {
+    adicionarItemManualForm();
+    setVozStatus('Item adicionado! Diga PRODUTO para o próximo ou PRONTO');
+    setVozCampo('');
+    vozAguardandoIgual = false;
+    vozCampoAtual = null;
+    return;
   }
 
-  setVozStatus('warn', 'Não entendi: "' + txt + '" — diga PRODUTO, PREÇO, QUANTIDADE ou ADICIONAR');
+  // Detecta palavras-chave de campo
+  if (!vozAguardandoIgual) {
+    if (n === 'produto') {
+      vozCampoAtual = 'produto';
+      vozAguardandoIgual = true;
+      setVozCampo('Campo: PRODUTO');
+      setVozStatus('Diga IGUAL e depois o nome do produto...');
+      return;
+    }
+    if (n === 'quantidade' || n === 'qtd') {
+      vozCampoAtual = 'quantidade';
+      vozAguardandoIgual = true;
+      setVozCampo('Campo: QUANTIDADE');
+      setVozStatus('Diga IGUAL e depois o número...');
+      return;
+    }
+    if (n === 'unidade') {
+      vozCampoAtual = 'unidade';
+      vozAguardandoIgual = true;
+      setVozCampo('Campo: UNIDADE');
+      setVozStatus('Diga IGUAL e depois a unidade (kg, gramas, litros, unidades)...');
+      return;
+    }
+    if (n === 'preco' || n === 'preço' || n === 'valor') {
+      vozCampoAtual = 'preco';
+      vozAguardandoIgual = true;
+      setVozCampo('Campo: PREÇO');
+      setVozStatus('Diga IGUAL e depois o valor...');
+      return;
+    }
+  }
+
+  // Aguardando IGUAL
+  if (vozAguardandoIgual) {
+    if (n === 'igual' || n.startsWith('igual ')) {
+      // Captura o valor após "igual" se vier junto
+      var valorApos = txt.replace(/^igual\s*/i, '').trim();
+      if (valorApos) {
+        vozAguardandoIgual = false;
+        capturarValorVoz(valorApos);
+      } else {
+        vozAguardandoIgual = false;
+        setVozStatus('Aguardando valor para ' + vozCampoAtual.toUpperCase() + '...');
+      }
+      return;
+    }
+    // Se não ouviu IGUAL, trata o que veio como o valor diretamente
+    vozAguardandoIgual = false;
+    capturarValorVoz(txt);
+    return;
+  }
+
+  setVozStatus('Não entendi. Diga: PRODUTO, QUANTIDADE, UNIDADE, PREÇO, ADICIONAR ou PRONTO');
 }
 
-function processarUnidadeVoz(n) {
-  var sigla = 'UN';
-  if (n.includes('grama')) sigla = 'G';
-  else if (n.includes('kg') || n.includes('quilo')) sigla = 'KG';
-  else if (n.includes('litro')) sigla = 'L';
-  else if (n.includes('mililitro') || n === 'ml') sigla = 'ML';
-  vozItem.uni = sigla;
-  document.getElementById('manUni').value = sigla;
-  setVozStatus('ok', '✓ Unidade: ' + sigla + ' — diga PREÇO');
-  vozCampo = null;
+function capturarValorVoz(txt) {
+  var n = normVoz(txt);
+  switch (vozCampoAtual) {
+    case 'produto':
+      var nomeProd = txt.charAt(0).toUpperCase() + txt.slice(1);
+      document.getElementById('manProduto').value = nomeProd;
+      filtrarProdutos(nomeProd);
+      setVozCampo('Produto: ' + nomeProd);
+      setVozStatus('✓ Diga PREÇO para continuar');
+      break;
+    case 'quantidade':
+      var num = extrairNumeroVoz(n);
+      document.getElementById('manQtd').value = num;
+      setVozCampo('Quantidade: ' + num);
+      setVozStatus('✓ Diga UNIDADE para continuar');
+      break;
+    case 'unidade':
+      var sigla = 'UN';
+      if (n.includes('grama')) sigla = 'G';
+      else if (n.includes('kg') || n.includes('quilo')) sigla = 'KG';
+      else if (n.includes('litro')) sigla = 'L';
+      else if (n.includes('mililitro') || n === 'ml') sigla = 'ML';
+      document.getElementById('manUni').value = sigla;
+      setVozCampo('Unidade: ' + sigla);
+      setVozStatus('✓ Diga PREÇO para continuar');
+      break;
+    case 'preco':
+      var v = extrairValorVoz(txt);
+      var vNum = parseFloat(v.replace('R$','').replace(',','.').trim()) || 0;
+      document.getElementById('manPreco').value = vNum.toFixed(2);
+      setVozCampo('Preço: R$ ' + vNum.toFixed(2).replace('.',','));
+      setVozStatus('✓ Diga ADICIONAR ou próximo PRODUTO');
+      break;
+  }
+  vozCampoAtual = null;
 }
 
 function extrairNumeroVoz(n) {
   var m = n.match(/(\d+)[,.]( \d+)/); if (m) return m[1] + '.' + m[2].trim();
   m = n.match(/\d+/); if (m) return m[0];
-  var ext = {'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'cem':100};
+  var ext = {'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,
+    'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,
+    'treze':13,'quatorze':14,'quinze':15,'dezesseis':16,'dezessete':17,
+    'dezoito':18,'dezenove':19,'vinte':20,'trinta':30,'quarenta':40,
+    'cinquenta':50,'sessenta':60,'setenta':70,'oitenta':80,'noventa':90,
+    'cem':100,'duzentos':200,'trezentos':300,'quatrocentos':400,'quinhentos':500,'mil':1000};
   var partes = n.split(/\s+/), soma = 0, ok = false;
   partes.forEach(function(p) { if (ext[p] !== undefined) { soma += ext[p]; ok = true; } });
   return ok ? String(soma) : '1';
 }
 
 function extrairValorVoz(txt) {
-  var n = txt.toLowerCase().replace(/reais|real/g,'').replace(/virgula|vírgula/g,',').trim();
+  var n = txt.toLowerCase()
+    .replace(/reais|real/g,'')
+    .replace(/virgula|vírgula/g,',')
+    .replace(/ponto/g,'.')
+    .trim();
   var m = n.match(/(\d+)[,.]( \d{1,2})/); if (m) return 'R$ ' + m[1] + ',' + m[2].trim().padEnd(2,'0');
   m = n.match(/(\d+)/); if (m) return 'R$ ' + m[1] + ',00';
   return txt;
 }
 
-function adicionarItemVoz() {
-  if (!vozItem.produto) { setVozStatus('warn', 'Informe o PRODUTO primeiro'); return; }
-  if (!vozItem.preco)   { setVozStatus('warn', 'Informe o PREÇO primeiro'); return; }
-  var valor = parseFloat(vozItem.preco.replace('R$','').replace(',','.').trim()) || 0;
-  state.itens.push({ produto: vozItem.produto, quantidade: vozItem.qtd + ' ' + vozItem.uni, valor: valor });
-  save(); renderItens(); atualizarTotais();
-  show('cardItens'); show('cardExport');
-  toast('✓ ' + vozItem.produto + ' adicionado!');
-  vozItem = { produto: '', qtd: '1', uni: 'UN', preco: '' };
-  document.getElementById('manProduto').value = '';
-  document.getElementById('manQtd').value = '1';
-  document.getElementById('manPreco').value = '';
-  setVozStatus('info', 'Adicionado! Diga PRODUTO para o próximo ou PRONTO');
-  vozCampo = null;
-}
 
 load();
 </script>
