@@ -631,8 +631,11 @@ function exportarCSV() {
   var hoje = new Date().toLocaleDateString('pt-BR');
   var header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
   var rows = state.itens.map(function(it) {
+    var valorStr = it.valor < 0
+      ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
+      : it.valor.toFixed(2).replace('.', ',');
     return hoje + ';' + it.produto + ';' + it.quantidade + ';' +
-           it.valor.toFixed(2).replace('.', ',') + ';' + state.estab + ';' + state.pgto;
+           valorStr + ';' + state.estab + ';' + state.pgto;
   });
   var csv = [header].concat(rows).join('\r\n');
   var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -671,8 +674,11 @@ function exportarDrive() {
   var hoje = new Date().toLocaleDateString('pt-BR');
   var header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO';
   var rows = state.itens.map(function(it) {
+    var valorStr = it.valor < 0
+      ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
+      : it.valor.toFixed(2).replace('.', ',');
     return hoje + ';' + it.produto + ';' + it.quantidade + ';' +
-           it.valor.toFixed(2).replace('.', ',') + ';' + state.estab + ';' + state.pgto;
+           valorStr + ';' + state.estab + ';' + state.pgto;
   });
   drivePendingCSV  = [header].concat(rows).join('\r\n');
   drivePendingFile = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
@@ -1001,6 +1007,11 @@ function parsearHtmlSefaz(html) {
   else if (/cart.o de d.bito|debito/.test(txtL))     r.pagamento = 'Debito';
   else if (/dinheiro|esp.cie/.test(txtL))            r.pagamento = 'Dinheiro';
 
+  // Desconto total
+  r.desconto = 0;
+  var mDesc = txt.match(/Descontos?\s*R?\$?:?\s*([0-9]+[.,][0-9]+)/i);
+  if (mDesc) r.desconto = parseFloat(mDesc[1].replace(',','.')) || 0;
+
   // Dois formatos possíveis:
   // FORMATO A — tudo na mesma linha:
   // "NOME (Código: XXXX)   Qtde.:1 UN: Un Vl. Unit.: X,XX  VL Total X,XX"
@@ -1099,8 +1110,12 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
   }
   if (parsed.itens && parsed.itens.length > 0) {
     state.itens = parsed.itens;
+    // Adiciona linha de desconto se houver
+    if (parsed.desconto && parsed.desconto > 0) {
+      state.itens.push({ produto: 'Credito em Descontos', quantidade: '1 UN', valor: -parsed.desconto });
+    }
     save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
-    toast('Itens extraidos da SEFAZ: ' + parsed.itens.length);
+    toast('Itens extraidos da SEFAZ: ' + state.itens.length);
   } else {
     toast('Itens nao extraidos - adicione manualmente.', 4000);
     if (urlOriginal) window.open(urlOriginal, '_blank');
