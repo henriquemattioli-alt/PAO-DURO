@@ -136,7 +136,7 @@
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
       <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span></div>
-      <div class="hsub">Leitor de cupom fiscal</div>
+      <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
       <i class="ti ti-key"></i>
@@ -377,10 +377,9 @@
     <button class="btn btn-green" onclick="exportarCSV()">
       <i class="ti ti-download"></i> Baixar CSV no celular
     </button>
-    <button class="btn btn-gray" style="margin-top:8px" id="btnDrive" onclick="exportarDrive()">
-      <i class="ti ti-brand-google-drive"></i> Salvar no Google Drive
+    <button class="btn btn-gray" style="margin-top:8px" onclick="compartilharCSV()">
+      <i class="ti ti-brand-whatsapp"></i> Compartilhar CSV
     </button>
-    <div id="driveStatus" class="drive-status hidden"></div>
     <button class="btn btn-danger" style="margin-top:8px" onclick="novaCompra()">
       <i class="ti ti-trash"></i> Limpar e nova compra
     </button>
@@ -413,6 +412,10 @@ function load() {
 }
 
 var BASE_URL = 'https://henriquemattioli-alt.github.io/PAO-DURO/';
+
+// ─── DETECÇÃO DE PLATAFORMA ───────────────────────────────────────────────────
+var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+var isAndroid = /Android/.test(navigator.userAgent);
 
 function carregarCSVsGitHub() {
   // Carrega estabelecimentos
@@ -829,6 +832,24 @@ function gerarCSV(callback) {
   } else {
     callback(montar(null, null));
   }
+}
+
+function compartilharCSV() {
+  if (!state.estab) { toast('Informe o estabelecimento'); return; }
+  if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+  var hoje = new Date().toLocaleDateString('pt-BR');
+  var filename = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
+  gerarCSV(function(csv) {
+    if (navigator.share) {
+      var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      var file = new File([blob], filename, { type: 'text/csv' });
+      navigator.share({ files: [file], title: 'Pão Duro — ' + hoje })
+        .catch(function(e) { if (e.name !== 'AbortError') toast('Erro ao compartilhar: ' + e.message); });
+    } else {
+      toast('Compartilhamento não disponível — use Baixar CSV');
+    }
+  });
 }
 
 function exportarCSV() {
@@ -1383,7 +1404,10 @@ function alternarVoz() {
 
 function iniciarVoz() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    toast('Reconhecimento de voz não disponível. Use Chrome ou Brave.'); return;
+    var msg = isIOS
+      ? 'Reconhecimento de voz não disponível. Use o Safari.'
+      : 'Reconhecimento de voz não disponível. Use Chrome ou Brave.';
+    toast(msg); return;
   }
   vozAtivo = true;
   vozEstado = VOZ_PRODUTO;
@@ -1434,7 +1458,8 @@ function escutarVoz() {
   vozRec = new SR();
   vozRec.lang = 'pt-BR';
   vozRec.continuous = false;
-  vozRec.interimResults = true;
+  // iOS Safari não suporta interimResults de forma confiável
+  vozRec.interimResults = isIOS ? false : true;
   vozRec.maxAlternatives = 1;
 
   vozRec.onresult = function(ev) {
@@ -1452,7 +1477,10 @@ function escutarVoz() {
 
   vozRec.onerror = function(e) {
     if (e.error === 'no-speech') {
-      if (vozAtivo) setTimeout(escutarVoz, 200);
+      if (vozAtivo) setTimeout(escutarVoz, isIOS ? 500 : 200);
+    } else if (e.error === 'not-allowed') {
+      setVozStatus('Permissão negada — habilite o microfone nas configurações');
+      pararVoz();
     } else {
       setVozStatus('Erro: ' + e.error);
       pararVoz();
@@ -1460,7 +1488,7 @@ function escutarVoz() {
   };
 
   vozRec.onend = function() {
-    if (vozAtivo) setTimeout(escutarVoz, 150);
+    if (vozAtivo) setTimeout(escutarVoz, isIOS ? 400 : 150);
   };
 
   vozRec.start();
@@ -1552,6 +1580,14 @@ function extrairValorVoz(n) {
 
 
 load();
+
+// Dica de instalação no iOS
+if (isIOS && !window.navigator.standalone) {
+  var sub = document.getElementById('appSub');
+  if (sub) {
+    sub.innerHTML = 'Leitor de cupom fiscal &nbsp;·&nbsp; <span style="color:var(--amber);font-size:11px">⬆ Instale via Safari → Compartilhar</span>';
+  }
+}
 </script>
 </body>
 </html>
