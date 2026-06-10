@@ -411,18 +411,18 @@ function importarEstabs(e) {
   var reader = new FileReader();
   reader.onload = function(ev) {
     var lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    var count = 0;
+    var novos = [];
     lines.forEach(function(l, idx) {
       var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
-      // Ignora cabeçalho (primeira linha se for texto sem números)
       if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
       var nomeCap = nome.toLowerCase().replace(/(?:^|\s)\S/g, function(a){return a.toUpperCase();});
-      if (nomeCap && !state.estabs.includes(nomeCap)) { state.estabs.push(nomeCap); count++; }
+      if (nomeCap) novos.push(nomeCap);
     });
+    state.estabs = novos;
     localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
     populateEstabSelect();
     show('manualEstab');
-    toast(count + ' estabelecimentos importados!');
+    toast(novos.length + ' estabelecimentos importados!');
   };
   reader.readAsText(file, 'UTF-8');
 }
@@ -632,16 +632,18 @@ function importarPgtos(e) {
   var reader = new FileReader();
   reader.onload = function(ev) {
     var lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    var count = 0;
+    var novos = [];
     lines.forEach(function(l, idx) {
       var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
       if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
-      if (nome && !state.pgtos.includes(nome)) { state.pgtos.push(nome); count++; }
+      var nomeCap = nome.toLowerCase().replace(/(?:^|\s)\S/g, function(a){return a.toUpperCase();});
+      if (nomeCap) novos.push(nomeCap);
     });
+    state.pgtos = novos;
     localStorage.setItem('pd_pgtos', JSON.stringify(state.pgtos));
     filtrarPgto('');
     show('manualPgto');
-    toast(count + ' formas de pagamento importadas!');
+    toast(novos.length + ' formas de pagamento importadas!');
   };
   reader.readAsText(file, 'UTF-8');
 }
