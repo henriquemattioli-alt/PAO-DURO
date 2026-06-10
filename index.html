@@ -265,18 +265,26 @@
     </div>
     <div id="manualPgto" class="hidden" style="margin-top:8px">
       <div class="field">
-        <label>Forma de pagamento</label>
-        <select id="pgtoSelect">
-          <option value="">Selecione...</option>
-          <option>Dinheiro</option>
-          <option>Pix</option>
-          <option>Debito</option>
-          <option>Credito</option>
-        </select>
+        <label>Buscar forma de pagamento</label>
+        <input type="text" id="pgtoBusca" placeholder="Digite para filtrar..." oninput="filtrarPgto(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
+        <div id="pgtoLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none"></div>
       </div>
-      <button class="btn btn-green btn-sm" style="margin-top:6px" onclick="salvarPgtoManual()">
-        <i class="ti ti-check"></i> Confirmar
-      </button>
+      <div class="field">
+        <label>Ou informe manualmente</label>
+        <div class="row-flex">
+          <input type="text" id="pgtoManualInput" placeholder="Ex: Credito Nubank 15" style="flex:1;font-size:13px">
+          <button class="btn btn-green btn-sm" style="width:auto" onclick="salvarPgtoManual()">
+            <i class="ti ti-check"></i>
+          </button>
+        </div>
+      </div>
+      <div class="row-flex" style="margin-top:4px">
+        <input type="file" accept=".csv,.txt" id="csvPgtoInput" class="hidden" onchange="importarPgtos(event)">
+        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvPgtoInput').click()">
+          <i class="ti ti-upload"></i> Importar CSV
+        </button>
+      </div>
+      <div class="import-note">CSV com uma forma de pagamento por linha.</div>
     </div>
     <div id="pgtoConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:14px;font-weight:600" id="pgtoFinal"></span>
@@ -335,7 +343,8 @@
 // ─── ESTADO ───────────────────────────────────────────────────────────────────
 var state = {
   estab: '', cidade: '', pgto: '', itens: [],
-  estabs: JSON.parse(localStorage.getItem('pd_estabs') || '[]')
+  estabs: JSON.parse(localStorage.getItem('pd_estabs') || '[]'),
+  pgtos: JSON.parse(localStorage.getItem('pd_pgtos') || '[]')
 };
 
 // ─── PERSISTÊNCIA ─────────────────────────────────────────────────────────────
@@ -582,9 +591,59 @@ function confirmarPgto(ok) {
 }
 
 function salvarPgtoManual() {
-  var v = document.getElementById('pgtoSelect').value;
-  if (!v) { toast('Selecione a forma de pagamento'); return; }
+  var v = document.getElementById('pgtoManualInput').value.trim();
+  if (!v) { toast('Informe a forma de pagamento'); return; }
+  if (!state.pgtos.includes(v)) {
+    state.pgtos.push(v);
+    localStorage.setItem('pd_pgtos', JSON.stringify(state.pgtos));
+  }
   setPgto(v);
+}
+
+function filtrarPgto(q) {
+  var lista = document.getElementById('pgtoLista');
+  var norm = q.toLowerCase().trim();
+  // Combina pgtos salvos com opções padrão
+  var todas = state.pgtos.length > 0 ? state.pgtos : ['Dinheiro', 'Pix', 'Debito', 'Credito'];
+  var filtrados = norm
+    ? todas.filter(function(p) { return p.toLowerCase().includes(norm); })
+    : todas;
+  if (filtrados.length === 0) { lista.style.display = 'none'; return; }
+  lista.style.display = 'block';
+  lista.innerHTML = '';
+  filtrados.forEach(function(p) {
+    var div = document.createElement('div');
+    div.textContent = p;
+    div.style.cssText = 'padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)';
+    div.addEventListener('click', function() {
+      document.getElementById('pgtoBusca').value = p;
+      document.getElementById('pgtoManualInput').value = p;
+      lista.style.display = 'none';
+      setPgto(p);
+    });
+    div.addEventListener('mouseenter', function() { this.style.background = 'var(--bg2)'; });
+    div.addEventListener('mouseleave', function() { this.style.background = ''; });
+    lista.appendChild(div);
+  });
+}
+
+function importarPgtos(e) {
+  var file = e.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var lines = ev.target.result.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    var count = 0;
+    lines.forEach(function(l, idx) {
+      var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
+      if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
+      if (nome && !state.pgtos.includes(nome)) { state.pgtos.push(nome); count++; }
+    });
+    localStorage.setItem('pd_pgtos', JSON.stringify(state.pgtos));
+    filtrarPgto('');
+    show('manualPgto');
+    toast(count + ' formas de pagamento importadas!');
+  };
+  reader.readAsText(file, 'UTF-8');
 }
 
 function setPgto(v) {
@@ -1035,7 +1094,7 @@ function parsearHtmlSefaz(html) {
   for (var i = 0; i < linhas.length; i++) {
     var l = linhas[i];
     // Formato A: linha com Código + Qtde + Total tudo junto
-    var mA = l.match(/^(.+?)\s*\(C[oó]digo:[^)]+\).*?Qtde\.:(\S+)\s+UN:\s*(\S+).*?(?:VL|Vl\.?)\s*[Tt]otal\s+([0-9,.]+)/i);
+    var mA = l.match(/^(.+?)\s*\(C[oó]digo:[^)]+\).*?Qtde\.:(\S+)\s+UN:\s*(\S+).*?(?:VL|Vl\.?)\s*[Tt]otal\s+([0-9]+[.,][0-9]{1,2})/i);
     if (mA) {
       var nome  = mA[1].trim();
       var num   = mA[2].replace(',','.');
@@ -1073,12 +1132,16 @@ function parsearHtmlSefaz(html) {
             qtd = num + ' ' + uni;
           }
           // Vl. Total — valor na próxima linha
-          if (/^Vl\.\s*Total/i.test(l) && j+1 < linhas.length) {
-            valor = parseFloat(linhas[j+1].replace(',','.')) || 0;
-            j += 2; break;
+          if (/^Vl\.\s*Total/i.test(l)) {
+            if (j+1 < linhas.length) {
+              valor = parseFloat(linhas[j+1].replace(',','.')) || 0;
+              j += 2;
+            }
+            break;
           }
-          // Próximo produto
+          // Próximo produto ou fim de itens
           if (j > i+2 && j+1 < linhas.length && /^\(C[oó]digo:/i.test(linhas[j+1])) break;
+          if (/^Qtd\. total|^Valor total|^Descontos/i.test(l)) break;
           j++;
         }
 
