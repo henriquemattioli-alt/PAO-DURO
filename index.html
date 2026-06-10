@@ -1213,13 +1213,9 @@ function capNome(txt) {
 }
 
 function aplicarResultadoSefaz(parsed, urlOriginal) {
+  // Estabelecimento — confirma se não foi definido ainda
   if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
-  if (parsed.pagamento) {
-    document.getElementById('pgtoDetectado').textContent = parsed.pagamento;
-    show('cardPagamento'); show('confirmPgto'); hide('manualPgto'); hide('pgtoConfirmado');
-  } else {
-    show('cardPagamento'); hide('confirmPgto'); show('manualPgto');
-  }
+  // Pagamento já foi selecionado pelo usuário antes — não sobrescreve
   if (parsed.itens && parsed.itens.length > 0) {
     state.itens = parsed.itens;
     // Adiciona linha de desconto se houver
@@ -1227,7 +1223,7 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
       state.itens.push({ produto: 'Credito em Descontos', quantidade: '1 UN', valor: -parsed.desconto });
     }
     save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
-    toast('Itens extraidos da SEFAZ: ' + state.itens.length);
+    toast('✓ ' + state.itens.length + ' itens extraidos da SEFAZ!');
   } else {
     toast('Itens nao extraidos - adicione manualmente.', 4000);
     if (urlOriginal) window.open(urlOriginal, '_blank');
