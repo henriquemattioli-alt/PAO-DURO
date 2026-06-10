@@ -614,7 +614,7 @@ function processarCupom(e) {
     var preview = document.getElementById('cupomPreview');
     preview.src = ev.target.result; preview.style.display = 'block';
     show('cupomProcessando');
-    hide('cardItens'); hide('cardPagamento'); hide('cardExport');
+    hide('cardItens'); hide('cardExport');
 
     var img = new Image();
     img.onload = function() {
@@ -924,8 +924,9 @@ function novaCompra() {
   if (state.itens.length > 0 && !confirm('Limpar a compra atual e começar nova?')) return;
   state.estab = ''; state.cidade = ''; state.pgto = ''; state.itens = [];
   save();
-  ['confirmEstab','manualEstab','estabConfirmado','confirmPgto','manualPgto',
-   'pgtoConfirmado','cardItens','cardPagamento','cardExport','driveStatus'].forEach(hide);
+  ['confirmEstab','manualEstab','estabConfirmado','confirmPgto',
+   'pgtoConfirmado','cardItens','cardExport','driveStatus'].forEach(hide);
+  show('manualPgto');
   document.getElementById('cupomPreview').style.display = 'none';
   document.getElementById('cupomInput').value = '';
   setGpsStatus('info', 'Aguardando GPS...');
@@ -1108,7 +1109,7 @@ function processarURLSefaz(url) {
   if (!url || !url.startsWith('http')) { toast('QR invalido.'); return; }
   toast('QR lido! Buscando na SEFAZ...', 4000);
   show('cupomProcessando');
-  hide('cardItens'); hide('cardPagamento'); hide('cardExport');
+  hide('cardItens'); hide('cardExport');
   tentarProxies(url);
 }
 
