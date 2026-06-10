@@ -411,45 +411,45 @@ var BASE_URL = 'https://henriquemattioli-alt.github.io/PAO-DURO/';
 
 function carregarCSVsGitHub() {
   // Carrega estabelecimentos
-  fetch(BASE_URL + 'estabs.CSV?v=' + Date.now())
-    .then(function(r) { if (!r.ok) throw new Error('estabs.CSV nao encontrado'); return r.text(); })
+  fetch(BASE_URL + 'estabs.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('estabs.csv nao encontrado'); return r.text(); })
     .then(function(txt) {
       var novos = parsearCSV(txt);
       if (novos.length > 0) {
         state.estabs = novos;
         localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
         populateEstabSelect();
-        console.log('estabs.CSV carregado:', novos.length, 'itens');
+        console.log('estabs.csv carregado:', novos.length, 'itens');
       }
     })
-    .catch(function(e) { console.log('estabs.CSV:', e.message); });
+    .catch(function(e) { console.log('estabs.csv:', e.message); });
 
   // Carrega produtos
-  fetch(BASE_URL + 'Produtos.csv?v=' + Date.now())
-    .then(function(r) { if (!r.ok) throw new Error('Produtos.csv nao encontrado'); return r.text(); })
+  fetch(BASE_URL + 'produtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('produtos.csv nao encontrado'); return r.text(); })
     .then(function(txt) {
       var novos = parsearCSV(txt);
       if (novos.length > 0) {
         state.produtos = novos;
         localStorage.setItem('pd_produtos', JSON.stringify(state.produtos));
-        console.log('Produtos.csv carregado:', novos.length, 'itens');
+        console.log('produtos.csv carregado:', novos.length, 'itens');
       }
     })
-    .catch(function(e) { console.log('Produtos.csv:', e.message); });
+    .catch(function(e) { console.log('produtos.csv:', e.message); });
 
   // Carrega formas de pagamento
-  fetch(BASE_URL + 'pagtos.CSV?v=' + Date.now())
-    .then(function(r) { if (!r.ok) throw new Error('pagtos.CSV nao encontrado'); return r.text(); })
+  fetch(BASE_URL + 'pagtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('pagtos.csv nao encontrado'); return r.text(); })
     .then(function(txt) {
       var novos = parsearCSV(txt);
       if (novos.length > 0) {
         state.pgtos = novos;
         localStorage.setItem('pd_pgtos', JSON.stringify(state.pgtos));
         filtrarPgto('');
-        console.log('pagtos.CSV carregado:', novos.length, 'itens');
+        console.log('pagtos.csv carregado:', novos.length, 'itens');
       }
     })
-    .catch(function(e) { console.log('pagtos.CSV:', e.message); });
+    .catch(function(e) { console.log('pagtos.csv:', e.message); });
 }
 
 function parsearCSV(txt) {
@@ -1544,3 +1544,4 @@ load();
 </script>
 </body>
 </html>
+
