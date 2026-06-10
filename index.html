@@ -301,7 +301,10 @@
       <i class="ti ti-microphone" id="iconeVoz"></i> <span id="textoVoz">Lançar por voz</span>
     </button>
     <div id="vozStatusDiv" class="hidden" style="margin-top:8px;font-size:13px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--bg2);border-left:3px solid var(--green)">
-      <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px" id="vozCampoAtualDiv"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:600;color:var(--green)" id="vozCampoAtualDiv"></div>
+        <button onclick="vozVoltar()" style="font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer">↩ Voltar</button>
+      </div>
       <span id="vozStatusTxt">Aguardando...</span>
     </div>
     <style>
@@ -1383,6 +1386,17 @@ function pararVoz() {
   document.getElementById('btnVoz').classList.remove('voz-ativo');
   document.getElementById('textoVoz').textContent = 'Lançar por voz';
   hide('vozStatusDiv');
+}
+
+function vozVoltar() {
+  vozEstado = VOZ_PRODUTO;
+  document.getElementById('manProduto').value = '';
+  document.getElementById('manQtd').value = '1';
+  document.getElementById('manUni').value = 'UN';
+  document.getElementById('manPreco').value = '';
+  document.getElementById('produtosLista').style.display = 'none';
+  setVozCampo('');
+  setVozStatus(VOZ_MSGS[VOZ_PRODUTO]);
 }
 
 function setVozStatus(msg) {
