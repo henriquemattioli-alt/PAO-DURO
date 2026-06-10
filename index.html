@@ -300,8 +300,8 @@
     <button class="btn btn-gray" id="btnVoz" onclick="alternarVoz()" style="transition:all .3s">
       <i class="ti ti-microphone" id="iconeVoz"></i> <span id="textoVoz">Lançar por voz</span>
     </button>
-    <div id="vozStatusDiv" class="hidden" style="margin-top:8px;font-size:13px;padding:8px 12px;border-radius:var(--radius-sm);background:var(--bg2);border-left:3px solid var(--green)">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:2px" id="vozCampoAtualDiv"></div>
+    <div id="vozStatusDiv" class="hidden" style="margin-top:8px;font-size:13px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--bg2);border-left:3px solid var(--green)">
+      <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px" id="vozCampoAtualDiv"></div>
       <span id="vozStatusTxt">Aguardando...</span>
     </div>
     <style>
@@ -311,8 +311,10 @@
     <hr class="divider" style="margin:10px 0">
     <div class="field">
       <label>Produto</label>
-      <input type="text" id="manProduto" placeholder="Digite para buscar..." oninput="filtrarProdutos(this.value)" autocomplete="off">
-      <div id="produtosLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none;margin-top:4px;position:relative;z-index:999;background:var(--bg)"></div>
+      <div style="position:relative">
+        <input type="text" id="manProduto" placeholder="Digite para buscar..." oninput="filtrarProdutos(this.value)" autocomplete="off">
+        <div id="produtosLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none;margin-top:2px;position:absolute;left:0;right:0;z-index:9999;background:var(--bg);box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <div class="field">
@@ -1295,8 +1297,16 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
 // ─── ENTRADA MANUAL + VOZ ─────────────────────────────────────────────────────
 var vozAtivo = false;
 var vozRec = null;
-var vozAguardandoIgual = false; // true quando ouviu palavra-chave e aguarda "IGUAL"
-var vozCampoAtual = null;       // campo que será preenchido após "IGUAL"
+// Estados sequenciais fixos
+var VOZ_PRODUTO = 0, VOZ_QUANTIDADE = 1, VOZ_UNIDADE = 2, VOZ_PRECO = 3, VOZ_COMANDO = 4;
+var vozEstado = VOZ_PRODUTO;
+var VOZ_MSGS = [
+  '🎤 Diga o nome do produto...',
+  '🎤 Diga a quantidade (número)...',
+  '🎤 Diga a unidade: kg, gramas, litros ou unidade...',
+  '🎤 Diga o preço...',
+  '🎤 Diga "adicionar mais" ou "finalizar"...'
+];
 
 function filtrarProdutos(q) {
   var lista = document.getElementById('produtosLista');
@@ -1352,24 +1362,25 @@ function iniciarVoz() {
     toast('Reconhecimento de voz não disponível. Use Chrome ou Brave.'); return;
   }
   vozAtivo = true;
-  vozAguardandoIgual = false;
-  vozCampoAtual = null;
+  vozEstado = VOZ_PRODUTO;
+  // Limpa campos para nova entrada
+  document.getElementById('manProduto').value = '';
+  document.getElementById('manQtd').value = '1';
+  document.getElementById('manUni').value = 'UN';
+  document.getElementById('manPreco').value = '';
+  document.getElementById('produtosLista').style.display = 'none';
   document.getElementById('btnVoz').classList.add('voz-ativo');
-  document.getElementById('iconeVoz').className = 'ti ti-microphone';
   document.getElementById('textoVoz').textContent = 'Parar voz';
   show('vozStatusDiv');
-  setVozStatus('Diga: PRODUTO, QUANTIDADE, UNIDADE ou PREÇO');
   setVozCampo('');
+  setVozStatus(VOZ_MSGS[VOZ_PRODUTO]);
   escutarVoz();
 }
 
 function pararVoz() {
   vozAtivo = false;
-  vozAguardandoIgual = false;
-  vozCampoAtual = null;
   if (vozRec) { try { vozRec.stop(); } catch(e) {} vozRec = null; }
   document.getElementById('btnVoz').classList.remove('voz-ativo');
-  document.getElementById('iconeVoz').className = 'ti ti-microphone';
   document.getElementById('textoVoz').textContent = 'Lançar por voz';
   hide('vozStatusDiv');
 }
@@ -1389,34 +1400,32 @@ function escutarVoz() {
   vozRec.lang = 'pt-BR';
   vozRec.continuous = false;
   vozRec.interimResults = true;
-  vozRec.maxAlternatives = 3;
+  vozRec.maxAlternatives = 1;
 
   vozRec.onresult = function(ev) {
     var interim = '', final = '';
     for (var i = ev.resultIndex; i < ev.results.length; i++) {
-      var t = ev.results[i][0].transcript.trim();
-      if (ev.results[i].isFinal) final = t;
-      else interim = t;
+      if (ev.results[i].isFinal) final = ev.results[i][0].transcript.trim();
+      else interim = ev.results[i][0].transcript.trim();
     }
-    // Mostra o que está ouvindo em tempo real
-    if (interim) setVozStatus('🎤 ' + interim + '...');
+    if (interim) setVozStatus('🎤 ouvindo: "' + interim + '"...');
     if (final) {
-      setVozStatus('🎤 "' + final + '"');
+      setVozStatus('✔ "' + final + '"');
       processarFalaVoz(final);
     }
   };
 
   vozRec.onerror = function(e) {
     if (e.error === 'no-speech') {
-      if (vozAtivo) setTimeout(escutarVoz, 100);
+      if (vozAtivo) setTimeout(escutarVoz, 200);
     } else {
-      setVozStatus('Erro: ' + e.error + ' — toque para tentar novamente');
+      setVozStatus('Erro: ' + e.error);
       pararVoz();
     }
   };
 
   vozRec.onend = function() {
-    if (vozAtivo) setTimeout(escutarVoz, 100);
+    if (vozAtivo) setTimeout(escutarVoz, 150);
   };
 
   vozRec.start();
@@ -1429,120 +1438,64 @@ function normVoz(txt) {
 function processarFalaVoz(txt) {
   var n = normVoz(txt);
 
-  // Detecta PRONTO/FINALIZAR
-  if (n.includes('pronto') || n.includes('finalizar') || n.includes('terminar')) {
-    var prod = document.getElementById('manProduto').value.trim();
-    var preco = parseFloat(document.getElementById('manPreco').value) || 0;
-    if (prod && preco) adicionarItemManualForm();
-    pararVoz();
-    toast('Entrada por voz concluída!');
-    return;
-  }
+  switch (vozEstado) {
 
-  // Detecta ADICIONAR/PRÓXIMO
-  if (n.includes('adicionar') || n.includes('proximo') || n.includes('próximo')) {
-    adicionarItemManualForm();
-    setVozStatus('Item adicionado! Diga PRODUTO para o próximo ou PRONTO');
-    setVozCampo('');
-    vozAguardandoIgual = false;
-    vozCampoAtual = null;
-    return;
-  }
-
-  // Detecta palavras-chave de campo
-  if (!vozAguardandoIgual) {
-    if (n === 'produto') {
-      vozCampoAtual = 'produto';
-      vozAguardandoIgual = true;
-      setVozCampo('Campo: PRODUTO');
-      setVozStatus('Diga IGUAL e depois o nome do produto...');
-      return;
-    }
-    if (n === 'quantidade' || n === 'qtd') {
-      vozCampoAtual = 'quantidade';
-      vozAguardandoIgual = true;
-      setVozCampo('Campo: QUANTIDADE');
-      setVozStatus('Diga IGUAL e depois o número...');
-      return;
-    }
-    if (n === 'unidade') {
-      vozCampoAtual = 'unidade';
-      vozAguardandoIgual = true;
-      setVozCampo('Campo: UNIDADE');
-      setVozStatus('Diga IGUAL e depois a unidade (kg, gramas, litros, unidades)...');
-      return;
-    }
-    if (n === 'preco' || n === 'preço' || n === 'valor') {
-      vozCampoAtual = 'preco';
-      vozAguardandoIgual = true;
-      setVozCampo('Campo: PREÇO');
-      setVozStatus('Diga IGUAL e depois o valor...');
-      return;
-    }
-  }
-
-  // Aguardando IGUAL
-  if (vozAguardandoIgual) {
-    if (n === 'igual' || n.startsWith('igual ')) {
-      // Captura o valor após "igual" se vier junto
-      var valorApos = txt.replace(/^igual\s*/i, '').trim();
-      if (valorApos) {
-        vozAguardandoIgual = false;
-        capturarValorVoz(valorApos);
-      } else {
-        vozAguardandoIgual = false;
-        setVozStatus('Aguardando valor para ' + vozCampoAtual.toUpperCase() + '...');
-      }
-      return;
-    }
-    // Se não ouviu IGUAL, trata o que veio como o valor diretamente
-    vozAguardandoIgual = false;
-    capturarValorVoz(txt);
-    return;
-  }
-
-  setVozStatus('Não entendi. Diga: PRODUTO, QUANTIDADE, UNIDADE, PREÇO, ADICIONAR ou PRONTO');
-}
-
-function capturarValorVoz(txt) {
-  var n = normVoz(txt);
-  switch (vozCampoAtual) {
-    case 'produto':
-      var nomeProd = txt.charAt(0).toUpperCase() + txt.slice(1);
+    case VOZ_PRODUTO:
+      var nomeProd = txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase();
       document.getElementById('manProduto').value = nomeProd;
       filtrarProdutos(nomeProd);
       setVozCampo('Produto: ' + nomeProd);
-      setVozStatus('✓ Diga PREÇO para continuar');
+      vozEstado = VOZ_QUANTIDADE;
+      setVozStatus(VOZ_MSGS[VOZ_QUANTIDADE]);
       break;
-    case 'quantidade':
+
+    case VOZ_QUANTIDADE:
       var num = extrairNumeroVoz(n);
       document.getElementById('manQtd').value = num;
-      setVozCampo('Quantidade: ' + num);
-      setVozStatus('✓ Diga UNIDADE para continuar');
+      setVozCampo(document.getElementById('vozCampoAtualDiv').textContent + ' | Qtd: ' + num);
+      vozEstado = VOZ_UNIDADE;
+      setVozStatus(VOZ_MSGS[VOZ_UNIDADE]);
       break;
-    case 'unidade':
+
+    case VOZ_UNIDADE:
       var sigla = 'UN';
-      if (n.includes('grama')) sigla = 'G';
+      if (n.includes('grama') || n === 'g') sigla = 'G';
       else if (n.includes('kg') || n.includes('quilo')) sigla = 'KG';
       else if (n.includes('litro')) sigla = 'L';
       else if (n.includes('mililitro') || n === 'ml') sigla = 'ML';
       document.getElementById('manUni').value = sigla;
-      setVozCampo('Unidade: ' + sigla);
-      setVozStatus('✓ Diga PREÇO para continuar');
+      setVozCampo(document.getElementById('vozCampoAtualDiv').textContent + ' | Un: ' + sigla);
+      vozEstado = VOZ_PRECO;
+      setVozStatus(VOZ_MSGS[VOZ_PRECO]);
       break;
-    case 'preco':
-      var v = extrairValorVoz(txt);
-      var vNum = parseFloat(v.replace('R$','').replace(',','.').trim()) || 0;
+
+    case VOZ_PRECO:
+      var vNum = extrairValorVoz(n);
       document.getElementById('manPreco').value = vNum.toFixed(2);
-      setVozCampo('Preço: R$ ' + vNum.toFixed(2).replace('.',','));
-      setVozStatus('✓ Diga ADICIONAR ou próximo PRODUTO');
+      setVozCampo(document.getElementById('vozCampoAtualDiv').textContent + ' | R$ ' + vNum.toFixed(2).replace('.',','));
+      vozEstado = VOZ_COMANDO;
+      setVozStatus(VOZ_MSGS[VOZ_COMANDO]);
+      break;
+
+    case VOZ_COMANDO:
+      if (n.includes('mais') || n.includes('adicionar') || n.includes('proximo') || n.includes('outro')) {
+        adicionarItemManualForm();
+        vozEstado = VOZ_PRODUTO;
+        setVozCampo('');
+        setVozStatus(VOZ_MSGS[VOZ_PRODUTO]);
+      } else if (n.includes('finalizar') || n.includes('pronto') || n.includes('terminar') || n.includes('fim')) {
+        adicionarItemManualForm();
+        pararVoz();
+        toast('Entrada por voz concluída!');
+      } else {
+        setVozStatus('Diga "adicionar mais" ou "finalizar"');
+      }
       break;
   }
-  vozCampoAtual = null;
 }
 
 function extrairNumeroVoz(n) {
-  var m = n.match(/(\d+)[,.]( \d+)/); if (m) return m[1] + '.' + m[2].trim();
+  var m = n.match(/(\d+)[,.](\d+)/); if (m) return m[1] + '.' + m[2];
   m = n.match(/\d+/); if (m) return m[0];
   var ext = {'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,
     'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,
@@ -1555,15 +1508,11 @@ function extrairNumeroVoz(n) {
   return ok ? String(soma) : '1';
 }
 
-function extrairValorVoz(txt) {
-  var n = txt.toLowerCase()
-    .replace(/reais|real/g,'')
-    .replace(/virgula|vírgula/g,',')
-    .replace(/ponto/g,'.')
-    .trim();
-  var m = n.match(/(\d+)[,.]( \d{1,2})/); if (m) return 'R$ ' + m[1] + ',' + m[2].trim().padEnd(2,'0');
-  m = n.match(/(\d+)/); if (m) return 'R$ ' + m[1] + ',00';
-  return txt;
+function extrairValorVoz(n) {
+  n = n.replace(/reais|real/g,'').replace(/virgula|vírgula/g,'.').replace(/ponto/g,'.').trim();
+  var m = n.match(/(\d+)[,.](\d{1,2})/); if (m) return parseFloat(m[1] + '.' + m[2]);
+  m = n.match(/(\d+)/); if (m) return parseFloat(m[1]);
+  return 0;
 }
 
 
