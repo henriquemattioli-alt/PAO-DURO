@@ -207,10 +207,10 @@
       <div class="row-flex" style="margin-top:4px">
         <input type="file" accept=".csv,.txt" id="csvEstabInput" class="hidden" onchange="importarEstabs(event)">
         <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvEstabInput').click()">
-          <i class="ti ti-upload"></i> Importar CSV
+          <i class="ti ti-upload"></i> Importar Estabelecimentos
         </button>
       </div>
-      <div class="import-note">CSV com um estabelecimento por linha. Usa a primeira coluna.</div>
+      <div class="import-note">CSV com um estabelecimento por linha.</div>
     </div>
     <div id="estabConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
       <div>
@@ -223,7 +223,49 @@
     </div>
   </div>
 
-  <!-- CARD: CUPOM FISCAL -->
+  <!-- CARD: PAGAMENTO -->
+  <div class="card" id="cardPagamento">
+    <div class="card-title"><i class="ti ti-credit-card"></i> Forma de pagamento</div>
+    <div id="confirmPgto" class="confirm-box hidden">
+      <div class="confirm-label">Detectado no cupom</div>
+      <div class="confirm-value" id="pgtoDetectado"></div>
+      <div class="confirm-btns">
+        <div class="btn-yes" onclick="confirmarPgto(true)"><i class="ti ti-check"></i> Sim</div>
+        <div class="btn-no" onclick="confirmarPgto(false)"><i class="ti ti-x"></i> Não</div>
+      </div>
+    </div>
+    <div id="manualPgto" style="margin-top:8px">
+      <div class="field">
+        <label>Buscar forma de pagamento</label>
+        <input type="text" id="pgtoBusca" placeholder="Digite para filtrar..." oninput="filtrarPgto(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
+        <div id="pgtoLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none"></div>
+      </div>
+      <div class="field">
+        <label>Ou informe manualmente</label>
+        <div class="row-flex">
+          <input type="text" id="pgtoManualInput" placeholder="Ex: Credito Nubank 15" style="flex:1;font-size:13px">
+          <button class="btn btn-green btn-sm" style="width:auto" onclick="salvarPgtoManual()">
+            <i class="ti ti-check"></i>
+          </button>
+        </div>
+      </div>
+      <div class="row-flex" style="margin-top:4px">
+        <input type="file" accept=".csv,.txt" id="csvPgtoInput" class="hidden" onchange="importarPgtos(event)">
+        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvPgtoInput').click()">
+          <i class="ti ti-upload"></i> Importar Pagamentos
+        </button>
+      </div>
+      <div class="import-note">CSV com uma forma de pagamento por linha.</div>
+    </div>
+    <div id="pgtoConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:600" id="pgtoFinal"></span>
+      <button class="btn btn-gray btn-sm" style="width:auto" onclick="trocarPgto()">
+        <i class="ti ti-edit"></i> Trocar
+      </button>
+    </div>
+  </div>
+
+    <!-- CARD: CUPOM FISCAL -->
   <div class="card">
     <div class="card-title"><i class="ti ti-scan"></i> Cupom fiscal</div>
     <button class="btn btn-green" id="btnQR" onclick="document.getElementById('qrFotoInput').click()">
@@ -249,48 +291,6 @@
     <img id="cupomPreview" class="preview-img" alt="Cupom">
     <div id="cupomProcessando" class="hidden" style="margin-top:12px;text-align:center;font-size:13px;color:var(--text2)">
       <span class="spinner"></span> Extraindo dados do cupom...
-    </div>
-  </div>
-
-  <!-- CARD: PAGAMENTO -->
-  <div class="card hidden" id="cardPagamento">
-    <div class="card-title"><i class="ti ti-credit-card"></i> Forma de pagamento</div>
-    <div id="confirmPgto" class="confirm-box">
-      <div class="confirm-label">Detectado no cupom</div>
-      <div class="confirm-value" id="pgtoDetectado"></div>
-      <div class="confirm-btns">
-        <div class="btn-yes" onclick="confirmarPgto(true)"><i class="ti ti-check"></i> Sim</div>
-        <div class="btn-no" onclick="confirmarPgto(false)"><i class="ti ti-x"></i> Não</div>
-      </div>
-    </div>
-    <div id="manualPgto" class="hidden" style="margin-top:8px">
-      <div class="field">
-        <label>Buscar forma de pagamento</label>
-        <input type="text" id="pgtoBusca" placeholder="Digite para filtrar..." oninput="filtrarPgto(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
-        <div id="pgtoLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none"></div>
-      </div>
-      <div class="field">
-        <label>Ou informe manualmente</label>
-        <div class="row-flex">
-          <input type="text" id="pgtoManualInput" placeholder="Ex: Credito Nubank 15" style="flex:1;font-size:13px">
-          <button class="btn btn-green btn-sm" style="width:auto" onclick="salvarPgtoManual()">
-            <i class="ti ti-check"></i>
-          </button>
-        </div>
-      </div>
-      <div class="row-flex" style="margin-top:4px">
-        <input type="file" accept=".csv,.txt" id="csvPgtoInput" class="hidden" onchange="importarPgtos(event)">
-        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvPgtoInput').click()">
-          <i class="ti ti-upload"></i> Importar CSV
-        </button>
-      </div>
-      <div class="import-note">CSV com uma forma de pagamento por linha.</div>
-    </div>
-    <div id="pgtoConfirmado" class="hidden" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:14px;font-weight:600" id="pgtoFinal"></span>
-      <button class="btn btn-gray btn-sm" style="width:auto" onclick="trocarPgto()">
-        <i class="ti ti-edit"></i> Trocar
-      </button>
     </div>
   </div>
 
@@ -354,8 +354,55 @@ function load() {
   var s = localStorage.getItem('pd_state');
   if (s) { try { var p = JSON.parse(s); state = Object.assign({}, state, p); } catch(e) {} }
   populateEstabSelect();
+  filtrarPgto('');
   restoreUI();
   atualizarBotaoDrive();
+  // Carrega CSVs do GitHub automaticamente
+  carregarCSVsGitHub();
+}
+
+var BASE_URL = 'https://henriquemattioli-alt.github.io/PAO-DURO/';
+
+function carregarCSVsGitHub() {
+  // Carrega estabelecimentos
+  fetch(BASE_URL + 'estabs.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('estabs.csv nao encontrado'); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) {
+        state.estabs = novos;
+        localStorage.setItem('pd_estabs', JSON.stringify(state.estabs));
+        populateEstabSelect();
+        console.log('estabs.csv carregado:', novos.length, 'itens');
+      }
+    })
+    .catch(function(e) { console.log('estabs.csv:', e.message); });
+
+  // Carrega formas de pagamento
+  fetch(BASE_URL + 'pgtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error('pgtos.csv nao encontrado'); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) {
+        state.pgtos = novos;
+        localStorage.setItem('pd_pgtos', JSON.stringify(state.pgtos));
+        filtrarPgto('');
+        console.log('pgtos.csv carregado:', novos.length, 'itens');
+      }
+    })
+    .catch(function(e) { console.log('pgtos.csv:', e.message); });
+}
+
+function parsearCSV(txt) {
+  var lines = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(Boolean);
+  var result = [];
+  lines.forEach(function(l, idx) {
+    var nome = l.split(/[;,\t]/)[0].replace(/"/g,'').trim();
+    if (idx === 0 && isNaN(nome[0]) && nome.toUpperCase() === nome) return;
+    var nomeCap = nome.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+    if (nomeCap) result.push(nomeCap);
+  });
+  return result;
 }
 
 // ─── UI HELPERS ───────────────────────────────────────────────────────────────
