@@ -870,29 +870,55 @@ function tokenizarTexto(str) {
   return norm.split(/\s+/).filter(function(t) { return t.length > 0; });
 }
 
+// Verifica se 'small' aparece como subsequência (na ordem, não contígua) em 'big'
+function isSubseq(small, big) {
+  var j = 0;
+  for (var i = 0; i < big.length && j < small.length; i++) {
+    if (big[i] === small[j]) j++;
+  }
+  return j === small.length;
+}
+
 function sugerirProdutos(descricaoLida, produtosTokenizados, qtd) {
   qtd = qtd || 3;
-  var tokensLido = tokenizarTexto(descricaoLida)
-    .filter(function(t) { return t.length >= 2; })
-    .sort(function(a, b) { return b.length - a.length; });
+  var tokensLido = [];
+  tokenizarTexto(descricaoLida).forEach(function(t) {
+    if (t.length >= 2 && tokensLido.indexOf(t) === -1) tokensLido.push(t);
+  });
+  tokensLido.sort(function(a, b) { return b.length - a.length; });
 
   if (tokensLido.length === 0) return new Array(qtd).fill('');
+  var total = tokensLido.length;
 
   var scores = produtosTokenizados.map(function(p) {
-    var score = 0;
+    var base = 0, matched = 0;
     tokensLido.forEach(function(tk) {
       if (p.tokens.indexOf(tk) !== -1) {
-        score += tk.length * 2; // match exato — peso dobrado
-      } else if (tk.length >= 3) {
-        for (var i = 0; i < p.tokens.length; i++) {
-          var tp = p.tokens[i];
-          if (tp.length >= 3 && (tp.indexOf(tk) !== -1 || tk.indexOf(tp) !== -1)) {
-            score += tk.length; // match parcial (substring)
-            break;
-          }
+        base += tk.length * 3; // match exato
+        matched++;
+        return;
+      }
+      if (tk.length < 3) return;
+      // match de prefixo (abreviação truncando o final da palavra, nas duas direções)
+      for (var i = 0; i < p.tokens.length; i++) {
+        var tp = p.tokens[i];
+        if (tp.length >= 3 && (tp.indexOf(tk) === 0 || tk.indexOf(tp) === 0)) {
+          base += tk.length * 2;
+          matched++;
+          return;
+        }
+      }
+      // fallback: subsequência (abreviação tipo "FEJ" -> "FEIJAO", letras na ordem)
+      for (var j = 0; j < p.tokens.length; j++) {
+        var tp2 = p.tokens[j];
+        if (tp2.length > tk.length && isSubseq(tk, tp2)) {
+          base += tk.length;
+          matched++;
+          return;
         }
       }
     });
+    var score = base * (matched / total);
     return { nome: p.nome, score: score };
   });
 
