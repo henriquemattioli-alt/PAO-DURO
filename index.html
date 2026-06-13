@@ -205,9 +205,8 @@
         </div>
       </div>
       <div class="row-flex" style="margin-top:4px">
-        <input type="file" accept=".csv,.txt" id="csvEstabInput" class="hidden" onchange="importarEstabs(event)">
-        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvEstabInput').click()">
-          <i class="ti ti-upload"></i> Importar Estabelecimentos
+        <button class="btn btn-gray btn-sm" style="width:auto" onclick="importarEstabsGitHub()">
+          <i class="ti ti-cloud-download"></i> Importar Estabelecimentos
         </button>
       </div>
       <div class="import-note">CSV com um estabelecimento por linha.</div>
@@ -250,9 +249,8 @@
         </div>
       </div>
       <div class="row-flex" style="margin-top:4px">
-        <input type="file" accept=".csv,.txt" id="csvPgtoInput" class="hidden" onchange="importarPgtos(event)">
-        <button class="btn btn-gray btn-sm" style="width:auto" onclick="document.getElementById('csvPgtoInput').click()">
-          <i class="ti ti-upload"></i> Importar Pagamentos
+        <button class="btn btn-gray btn-sm" style="width:auto" onclick="importarPgtosGitHub()">
+          <i class="ti ti-cloud-download"></i> Importar Pagamentos
         </button>
       </div>
       <div class="import-note">CSV com uma forma de pagamento por linha.</div>
@@ -555,6 +553,36 @@ function selecionarEstabLista(nome) {
   document.getElementById('estabManual').value = cap;
   document.getElementById('estabBusca').value = cap;
   document.getElementById('estabLista').style.display = 'none';
+}
+
+function importarEstabsGitHub() {
+  toast('Buscando estabelecimentos...');
+  fetch(BASE_URL + 'estabs.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) {
+        state.estabs = novos;
+        localStorage.setItem('pd_estabs', JSON.stringify(novos));
+        populateEstabSelect();
+        toast(novos.length + ' estabelecimentos carregados!');
+      } else { toast('Nenhum estabelecimento encontrado'); }
+    }).catch(function() { toast('Erro ao buscar estabs.csv do GitHub'); });
+}
+
+function importarPgtosGitHub() {
+  toast('Buscando formas de pagamento...');
+  fetch(BASE_URL + 'pagtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) {
+        state.pgtos = novos;
+        localStorage.setItem('pd_pgtos', JSON.stringify(novos));
+        filtrarPgto('');
+        toast(novos.length + ' formas de pagamento carregadas!');
+      } else { toast('Nenhuma forma de pagamento encontrada'); }
+    }).catch(function() { toast('Erro ao buscar pagtos.csv do GitHub'); });
 }
 
 function importarEstabs(e) {
