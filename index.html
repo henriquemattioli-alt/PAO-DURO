@@ -947,7 +947,10 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
         }
       }
     });
-    var score = base * (matched / total);
+    // Penaliza descrições do catálogo muito mais longas que a lida
+    // (ex: combos "ALHO,ATUM,SARDINHA,FEIJOADA..." não devem ganhar de "SARDINHA")
+    var fatorTamanho = p.tokens.length <= total ? 1 : total / p.tokens.length;
+    var score = base * (matched / total) * fatorTamanho;
     return { nome: p.nome, score: score };
   });
 
