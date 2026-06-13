@@ -141,8 +141,8 @@
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
       <i class="ti ti-key"></i>
     </button>
-    <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarDrive()" title="Configurar Google Drive">
-      <i class="ti ti-brand-google-drive"></i>
+    <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="recarregarTabelas()" title="Recarregar tabelas do servidor" id="btnRecarregar">
+      <i class="ti ti-cloud-download"></i>
     </button>
     <button class="btn btn-gray btn-sm" style="width:auto" onclick="novaCompra()">
       <i class="ti ti-refresh"></i> Nova
@@ -416,6 +416,43 @@ var BASE_URL = 'https://henriquemattioli-alt.github.io/PAO-DURO/';
 // ─── DETECÇÃO DE PLATAFORMA ───────────────────────────────────────────────────
 var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 var isAndroid = /Android/.test(navigator.userAgent);
+
+function recarregarTabelas() {
+  var btn = document.getElementById('btnRecarregar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i>';
+  var total = 0, erros = 0;
+  function fim() {
+    total++;
+    if (total === 3) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-cloud-download"></i>';
+      if (erros === 0) toast('Tabelas atualizadas!');
+      else toast('Atenção: ' + erros + ' tabela(s) não carregaram');
+    }
+  }
+  fetch(BASE_URL + 'estabs.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) { state.estabs = novos; localStorage.setItem('pd_estabs', JSON.stringify(novos)); populateEstabSelect(); }
+      fim();
+    }).catch(function() { erros++; fim(); });
+  fetch(BASE_URL + 'produtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) { state.produtos = novos; localStorage.setItem('pd_produtos', JSON.stringify(novos)); }
+      fim();
+    }).catch(function() { erros++; fim(); });
+  fetch(BASE_URL + 'pagtos.csv?v=' + Date.now())
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) {
+      var novos = parsearCSV(txt);
+      if (novos.length > 0) { state.pgtos = novos; localStorage.setItem('pd_pgtos', JSON.stringify(novos)); filtrarPgto(''); }
+      fim();
+    }).catch(function() { erros++; fim(); });
+}
 
 function carregarCSVsGitHub() {
   // Carrega estabelecimentos
