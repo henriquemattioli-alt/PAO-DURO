@@ -912,13 +912,7 @@ var drivePendingCSV   = null;
 var drivePendingFile  = null;
 
 function atualizarBotaoDrive() {
-  var clientId = localStorage.getItem('pd_drive_client') || '';
-  var btn = document.getElementById('btnDrive');
-  if (clientId) {
-    btn.innerHTML = '<i class="ti ti-brand-google-drive"></i> Salvar no Google Drive';
-  } else {
-    btn.innerHTML = '<i class="ti ti-brand-google-drive"></i> Configurar Google Drive';
-  }
+  // botão Drive removido — função mantida para compatibilidade
 }
 
 function exportarDrive() {
