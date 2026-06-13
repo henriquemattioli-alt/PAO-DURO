@@ -863,7 +863,7 @@ function atualizarTotais() {
   document.getElementById('itemCount').textContent = state.itens.length;
 }
 
-// ─── SUGESTÃO DE PRODUTOS (fuzzy match por tokens) ────────────────────────────
+// ─── SUGESTÃO DE PRODUTOS (fuzzy match por tokens + IDF) ──────────────────────
 function tokenizarTexto(str) {
   var norm = str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   norm = norm.replace(/[^a-z0-9\s]/g, ' ');
@@ -879,7 +879,35 @@ function isSubseq(small, big) {
   return j === small.length;
 }
 
-function sugerirProdutos(descricaoLida, produtosTokenizados, qtd) {
+function temDigito(t) { return /[0-9]/.test(t); }
+
+// Frequência de cada token entre os produtos (quantos produtos contêm o token)
+function calcularFrequencias(produtosTokenizados) {
+  var freq = {};
+  produtosTokenizados.forEach(function(p) {
+    var vistos = {};
+    p.tokens.forEach(function(t) {
+      if (!vistos[t]) { vistos[t] = true; freq[t] = (freq[t] || 0) + 1; }
+    });
+  });
+  return freq;
+}
+
+// IDF: palavras raras (ex: SARDINHA) pesam mais que palavras comuns (ex: OLEO).
+// Limita freq mínima a 2 para não disparar com termos únicos isolados.
+function idf(tok, freq, N) {
+  var f = Math.max(freq[tok] || 0, 2);
+  return Math.log((N + 1) / (f + 1)) + 1;
+}
+
+var TIER_EXATO = 1.2, TIER_PREFIXO = 1.0, TIER_SUBSEQ = 0.6;
+
+function pesoToken(tk, tp, tier, freq, N) {
+  if (temDigito(tk)) return tk.length * tier; // tokens numéricos (80g, 1kg): sem IDF
+  return idf(tp, freq, N) * tk.length * tier;
+}
+
+function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
   qtd = qtd || 3;
   var tokensLido = [];
   tokenizarTexto(descricaoLida).forEach(function(t) {
@@ -894,16 +922,17 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, qtd) {
     var base = 0, matched = 0;
     tokensLido.forEach(function(tk) {
       if (p.tokens.indexOf(tk) !== -1) {
-        base += tk.length * 3; // match exato
+        base += pesoToken(tk, tk, TIER_EXATO, freq, N); // match exato
         matched++;
         return;
       }
       if (tk.length < 3) return;
-      // match de prefixo (abreviação truncando o final da palavra, nas duas direções)
+      // match de prefixo: palavra do produto começa com a abreviação lida
+      // (ex: "sard" -> "sardinha", "refri" -> "refrigerantes")
       for (var i = 0; i < p.tokens.length; i++) {
         var tp = p.tokens[i];
-        if (tp.length >= 3 && (tp.indexOf(tk) === 0 || tk.indexOf(tp) === 0)) {
-          base += tk.length * 2;
+        if (tp.length >= tk.length && tp.indexOf(tk) === 0) {
+          base += pesoToken(tk, tp, TIER_PREFIXO, freq, N);
           matched++;
           return;
         }
@@ -912,7 +941,7 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, qtd) {
       for (var j = 0; j < p.tokens.length; j++) {
         var tp2 = p.tokens[j];
         if (tp2.length > tk.length && isSubseq(tk, tp2)) {
-          base += tk.length;
+          base += pesoToken(tk, tp2, TIER_SUBSEQ, freq, N);
           matched++;
           return;
         }
@@ -940,12 +969,14 @@ function gerarCSV(callback) {
   var produtosTokenizados = state.produtos.map(function(p) {
     return { nome: p, tokens: tokenizarTexto(p) };
   });
+  var freqTokens = calcularFrequencias(produtosTokenizados);
+  var nProdutos = produtosTokenizados.length;
 
   var rows = state.itens.map(function(it) {
     var valorStr = it.valor < 0
       ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
       : it.valor.toFixed(2).replace('.', ',');
-    var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, 3);
+    var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
     return data + ';' + it.produto + ';' + it.quantidade + ';' +
            valorStr + ';' + state.estab + ';' + state.pgto + ';' +
            sugestoes.join(';');
