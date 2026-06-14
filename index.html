@@ -1007,12 +1007,25 @@ function gerarCSV(callback) {
   }
 }
 
+// Gera nome de arquivo único: estabelecimento + data + hora (evita sobrescrever
+// compras feitas no mesmo dia/estabelecimento em horários diferentes)
+function nomeArquivoCSV() {
+  var agora = new Date();
+  var data = agora.toLocaleDateString('pt-BR').replace(/\//g, '-');
+  var hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+  var estab = (state.estab || 'sem_estab')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return 'pao_duro_' + estab + '_' + data + '_' + hora + '.csv';
+}
+
 function compartilharCSV() {
   if (!state.estab) { toast('Informe o estabelecimento'); return; }
   if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
   if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+  var filename = nomeArquivoCSV();
   var hoje = new Date().toLocaleDateString('pt-BR');
-  var filename = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
   gerarCSV(function(csv) {
     if (navigator.share) {
       var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1029,12 +1042,11 @@ function exportarCSV() {
   if (!state.estab) { toast('Informe o estabelecimento'); return; }
   if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
   if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
-  var hoje = new Date().toLocaleDateString('pt-BR');
   gerarCSV(function(csv) {
     var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
+    a.href = url; a.download = nomeArquivoCSV();
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
     toast('CSV exportado com sucesso!');
@@ -1059,8 +1071,7 @@ function exportarDrive() {
   var clientId = localStorage.getItem('pd_drive_client') || '';
   if (!clientId) { show('cardDrive'); return; }
 
-  var hoje = new Date().toLocaleDateString('pt-BR');
-  drivePendingFile = 'pao_duro_' + hoje.replace(/\//g, '-') + '.csv';
+  drivePendingFile = nomeArquivoCSV();
   gerarCSV(function(csv) {
     drivePendingCSV = csv;
     iniciarDrive(clientId);
