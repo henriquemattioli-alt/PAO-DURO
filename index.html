@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v5</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v7</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1383,14 +1383,24 @@ function tentarProxies(urlSefaz) {
           var txt2 = doc2.body ? doc2.body.textContent : html2;
           var linhas2 = txt2.split(/[\r\n]+/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
           console.log('Total de linhas:', linhas2.length);
-          var achouEAN = false;
-          linhas2.forEach(function(l, i) {
-            if (/ean/i.test(l)) {
-              achouEAN = true;
-              console.log('EAN linha ' + i + ' [' + linhas2.slice(Math.max(0,i-2), i+6).join(' || ') + ']');
+
+          // Extrai sequência de EANs "Comercial" (ignora "Tributável" se for igual ao anterior)
+          var eans = [];
+          for (var i = 0; i < linhas2.length - 1; i++) {
+            if (/^C[oó]digo EAN Comercial$/i.test(linhas2[i])) {
+              var val = linhas2[i+1];
+              if (/^[0-9]{8,14}$/.test(val)) eans.push(val);
             }
-          });
-          if (!achouEAN) console.log('Nenhum "EAN" encontrado na resposta de &abas=1');
+          }
+          console.log('Total de EANs "Comercial" encontrados:', eans.length);
+          console.log('Total de itens no parser original:', state.itens.length);
+          console.log('--- Comparação ordem (item parseado | EAN na mesma posição) ---');
+          var max = Math.max(eans.length, state.itens.length);
+          for (var k = 0; k < max; k++) {
+            var nomeItem = state.itens[k] ? state.itens[k].produto : '(sem item)';
+            var eanItem = eans[k] || '(sem EAN)';
+            console.log(k + ': ' + nomeItem + '  <->  ' + eanItem);
+          }
           console.log('=== FIM TESTE &abas=1 ===');
         })
         .catch(function(e2) { console.log('Erro no teste &abas=1:', e2.message); });
