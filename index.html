@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v8</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v10</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -970,7 +970,7 @@ function gerarCSV(callback) {
   var agora = new Date();
   var data  = agora.toLocaleDateString('pt-BR');
   var hora  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  var header = 'DATA;PRODUTO;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO;SUGESTAO1;SUGESTAO2;SUGESTAO3';
+  var header = 'DATA;PRODUTO;EAN;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO;SUGESTAO1;SUGESTAO2;SUGESTAO3';
 
   var produtosTokenizados = state.produtos.map(function(p) {
     return { nome: p, tokens: tokenizarTexto(p) };
@@ -983,7 +983,7 @@ function gerarCSV(callback) {
       ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
       : it.valor.toFixed(2).replace('.', ',');
     var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
-    return data + ';' + it.produto + ';' + it.quantidade + ';' +
+    return data + ';' + it.produto + ';' + (it.ean || '') + ';' + it.quantidade + ';' +
            valorStr + ';' + state.estab + ';' + state.pgto + ';' +
            sugestoes.join(';');
   });
@@ -1373,36 +1373,8 @@ function tentarProxies(urlSefaz) {
       hide('cupomProcessando');
       aplicarResultadoSefaz(parsearHtmlSefaz(html), urlSefaz);
 
-      // ── DEBUG TEMPORÁRIO: tentar a página "Visualizar em Abas" via postback ──
-      console.log('=== TESTANDO &abas=1 (postback Visualizar em Abas) ===');
-      fetch(PROXY_URL + encodeURIComponent(urlSefaz) + '&abas=1')
-        .then(function(r2) { return r2.text(); })
-        .then(function(html2) {
-          console.log('Resposta &abas=1: tamanho =', html2.length, 'chars');
-          var doc2 = new DOMParser().parseFromString(html2, 'text/html');
-          var txt2 = doc2.body ? doc2.body.textContent : html2;
-          var linhas2 = txt2.split(/[\r\n]+/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
-          console.log('Total de linhas:', linhas2.length);
-
-          // Extrai sequência de valores após "Código EAN Comercial" (numérico OU "SEM GTIN")
-          var eans = [];
-          for (var i = 0; i < linhas2.length - 1; i++) {
-            if (/^C[oó]digo EAN Comercial$/i.test(linhas2[i])) {
-              eans.push(linhas2[i+1]);
-            }
-          }
-          console.log('Total de EANs "Comercial" encontrados:', eans.length);
-          console.log('Total de itens no parser original:', state.itens.length);
-          console.log('--- Comparação ordem (item parseado | EAN na mesma posição) ---');
-          var max = Math.max(eans.length, state.itens.length);
-          for (var k = 0; k < max; k++) {
-            var nomeItem = state.itens[k] ? state.itens[k].produto : '(sem item)';
-            var eanItem = eans[k] || '(sem EAN)';
-            console.log(k + ': ' + nomeItem + '  <->  ' + eanItem);
-          }
-          console.log('=== FIM TESTE &abas=1 ===');
-        })
-        .catch(function(e2) { console.log('Erro no teste &abas=1:', e2.message); });
+      // Busca EANs em segundo plano (não bloqueia a UI); itens já aparecem na tela
+      buscarEANs(urlSefaz);
     })
     .catch(function(err) {
       hide('cupomProcessando');
@@ -1412,55 +1384,48 @@ function tentarProxies(urlSefaz) {
     });
 }
 
+// Busca a página detalhada (postback "Visualizar em Abas") e extrai os EANs,
+// associando por ORDEM aos itens já extraídos. Roda em segundo plano.
+function buscarEANs(urlSefaz, tentativa) {
+  tentativa = tentativa || 1;
+  fetch(PROXY_URL + encodeURIComponent(urlSefaz) + '&abas=1')
+    .then(function(r) { return r.text(); })
+    .then(function(html2) {
+      var doc2 = new DOMParser().parseFromString(html2, 'text/html');
+      var txt2 = doc2.body ? doc2.body.textContent : html2;
+      var linhas2 = txt2.split(/[\r\n]+/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+
+      var eans = [];
+      for (var i = 0; i < linhas2.length - 1; i++) {
+        if (/^C[oó]digo EAN Comercial$/i.test(linhas2[i])) {
+          eans.push(linhas2[i+1]);
+        }
+      }
+
+      if (eans.length === 0 && tentativa < 2) {
+        // Postback não disparou (voltou a página resumida) — tenta mais uma vez
+        setTimeout(function() { buscarEANs(urlSefaz, tentativa + 1); }, 700);
+        return;
+      }
+
+      if (eans.length > 0) {
+        state.itens.forEach(function(item, i) {
+          item.ean = eans[i] || '';
+        });
+        save();
+      }
+    })
+    .catch(function(e) {
+      console.warn('Busca de EAN falhou:', e.message);
+    });
+}
+
 function parsearHtmlSefaz(html) {
   var doc = new DOMParser().parseFromString(html, 'text/html');
   var txt = doc.body ? doc.body.textContent : html;
   var r = { estabelecimento: '', pagamento: '', itens: [] };
 
   var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-
-  // ── DEBUG TEMPORÁRIO: localizar onde o EAN aparece no texto ──────────────────
-  console.log('=== DEBUG EAN — total de linhas:', linhas.length, '===');
-  linhas.forEach(function(l, i) {
-    if (/ean/i.test(l)) {
-      console.log('Linha ' + i + ' [' + linhas.slice(Math.max(0,i-2), i+6).join(' || ') + ']');
-    }
-  });
-  console.log('=== FIM DEBUG EAN ===');
-
-  // ── DEBUG: procurar link/botão "Visualizar em Abas" no HTML bruto ────────────
-  console.log('=== DEBUG LINKS (Abas/Produtos/postback) ===');
-  var anchors = doc.querySelectorAll('a, button, input[type=button], input[type=submit]');
-  anchors.forEach(function(el) {
-    var texto = (el.textContent || el.value || '').trim();
-    if (/abas|produtos|detalh/i.test(texto)) {
-      console.log('TAG:', el.tagName, '| TEXTO:', texto,
-        '| href:', el.getAttribute('href'),
-        '| onclick:', el.getAttribute('onclick'),
-        '| id:', el.id, '| name:', el.getAttribute('name'));
-    }
-  });
-  console.log('=== FIM DEBUG LINKS ===');
-
-  // ── DEBUG: tamanho dos campos ASP.NET necessários para __doPostBack ──────────
-  console.log('=== DEBUG VIEWSTATE ===');
-  ['__VIEWSTATE','__VIEWSTATEGENERATOR','__EVENTVALIDATION','__EVENTTARGET','__EVENTARGUMENT'].forEach(function(name) {
-    var el = doc.querySelector('input[name="' + name + '"], [id="' + name + '"]');
-    if (el) {
-      console.log(name + ': presente, tamanho =', (el.value || '').length, 'chars');
-    } else {
-      console.log(name + ': NAO ENCONTRADO');
-    }
-  });
-  // Outros campos do form que precisariam ser reenviados
-  var form = doc.querySelector('form');
-  if (form) {
-    var inputs = form.querySelectorAll('input, select');
-    console.log('Total de campos no form:', inputs.length, '| action:', form.getAttribute('action'), '| method:', form.getAttribute('method'));
-  } else {
-    console.log('Nenhum <form> encontrado na página');
-  }
-  console.log('=== FIM DEBUG VIEWSTATE ===');
 
   // Estabelecimento — linha antes do CNPJ
   for (var i = 0; i < Math.min(15, linhas.length); i++) {
