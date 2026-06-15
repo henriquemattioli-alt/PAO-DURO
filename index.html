@@ -1385,6 +1385,15 @@ function parsearHtmlSefaz(html) {
 
   var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
+  // ── DEBUG TEMPORÁRIO: localizar onde o EAN aparece no texto ──────────────────
+  console.log('=== DEBUG EAN — total de linhas:', linhas.length, '===');
+  linhas.forEach(function(l, i) {
+    if (/ean/i.test(l)) {
+      console.log('Linha ' + i + ' [' + linhas.slice(Math.max(0,i-2), i+6).join(' || ') + ']');
+    }
+  });
+  console.log('=== FIM DEBUG EAN ===');
+
   // Estabelecimento — linha antes do CNPJ
   for (var i = 0; i < Math.min(15, linhas.length); i++) {
     if (/^CNPJ/i.test(linhas[i])) {
