@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v12</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v13</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -394,6 +394,9 @@
     </button>
     <button class="btn btn-gray" style="margin-top:8px" onclick="compartilharCSV()">
       <i class="ti ti-brand-whatsapp"></i> Compartilhar CSV
+    </button>
+    <button class="btn btn-gray" style="margin-top:8px" onclick="copiarCSV()">
+      <i class="ti ti-clipboard"></i> Copiar CSV (área de transferência)
     </button>
     <button class="btn btn-gray" style="margin-top:8px" onclick="salvarAssociacoesEAN()">
       <i class="ti ti-brand-github"></i> Salvar associações EAN
@@ -1095,6 +1098,35 @@ function nomeArquivoCSV() {
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
   return 'pao_duro_' + estab + '_' + data + '_' + hora + '.csv';
+}
+
+function copiarCSV() {
+  if (!state.estab) { toast('Informe o estabelecimento'); return; }
+  if (!state.pgto)  { toast('Informe a forma de pagamento'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item para exportar'); return; }
+
+  gerarCSV(function(csv) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(csv)
+        .then(function() { toast('✓ CSV copiado! Cole no WhatsApp Web.'); })
+        .catch(function() { toast('Erro ao copiar — tente o botão Compartilhar', 4000); });
+    } else {
+      // Fallback para navegadores sem Clipboard API
+      var ta = document.createElement('textarea');
+      ta.value = csv;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        toast('✓ CSV copiado! Cole no WhatsApp Web.');
+      } catch (e) {
+        toast('Erro ao copiar — tente o botão Compartilhar', 4000);
+      }
+      document.body.removeChild(ta);
+    }
+  });
 }
 
 function compartilharCSV() {
