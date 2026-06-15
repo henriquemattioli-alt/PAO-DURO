@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v3</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v4</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1410,6 +1410,26 @@ function parsearHtmlSefaz(html) {
     }
   });
   console.log('=== FIM DEBUG LINKS ===');
+
+  // ── DEBUG: tamanho dos campos ASP.NET necessários para __doPostBack ──────────
+  console.log('=== DEBUG VIEWSTATE ===');
+  ['__VIEWSTATE','__VIEWSTATEGENERATOR','__EVENTVALIDATION','__EVENTTARGET','__EVENTARGUMENT'].forEach(function(name) {
+    var el = doc.querySelector('input[name="' + name + '"], [id="' + name + '"]');
+    if (el) {
+      console.log(name + ': presente, tamanho =', (el.value || '').length, 'chars');
+    } else {
+      console.log(name + ': NAO ENCONTRADO');
+    }
+  });
+  // Outros campos do form que precisariam ser reenviados
+  var form = doc.querySelector('form');
+  if (form) {
+    var inputs = form.querySelectorAll('input, select');
+    console.log('Total de campos no form:', inputs.length, '| action:', form.getAttribute('action'), '| method:', form.getAttribute('method'));
+  } else {
+    console.log('Nenhum <form> encontrado na página');
+  }
+  console.log('=== FIM DEBUG VIEWSTATE ===');
 
   // Estabelecimento — linha antes do CNPJ
   for (var i = 0; i < Math.min(15, linhas.length); i++) {
