@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v10</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v11</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -143,6 +143,9 @@
     </button>
     <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="recarregarTabelas()" title="Recarregar tabelas do servidor" id="btnRecarregar">
       <i class="ti ti-cloud-download"></i>
+    </button>
+    <button class="btn btn-gray btn-sm" style="width:auto;margin-right:4px" onclick="configurarGithub()" title="Token GitHub (dicionário EAN)">
+      <i class="ti ti-brand-github"></i>
     </button>
     <button class="btn btn-gray btn-sm" style="width:auto" onclick="novaCompra()">
       <i class="ti ti-refresh"></i> Nova
@@ -158,6 +161,17 @@
     </div>
     <button class="btn btn-green" onclick="salvarChave()"><i class="ti ti-check"></i> Salvar chave</button>
     <div class="import-note" style="margin-top:8px">Chave gratuita em aistudio.google.com</div>
+  </div>
+
+  <!-- CARD: GITHUB (dicionario EAN) -->
+  <div class="card hidden" id="cardGithub">
+    <div class="card-title"><i class="ti ti-brand-github"></i> Token GitHub (dicionário EAN)</div>
+    <div class="field">
+      <label>Cole seu Personal Access Token (começa com github_pat_... ou ghp_...)</label>
+      <input type="text" id="inputGithub" placeholder="github_pat_...">
+    </div>
+    <button class="btn btn-green" onclick="salvarTokenGithub()"><i class="ti ti-check"></i> Salvar token</button>
+    <div class="import-note" style="margin-top:8px">Precisa de permissão "Contents: Read and write" no repositório PAO-DURO.</div>
   </div>
 
   <!-- CARD: GOOGLE DRIVE -->
@@ -380,6 +394,9 @@
     </button>
     <button class="btn btn-gray" style="margin-top:8px" onclick="compartilharCSV()">
       <i class="ti ti-brand-whatsapp"></i> Compartilhar CSV
+    </button>
+    <button class="btn btn-gray" style="margin-top:8px" onclick="salvarAssociacoesEAN()">
+      <i class="ti ti-brand-github"></i> Salvar associações EAN
     </button>
     <button class="btn btn-danger" style="margin-top:8px" onclick="novaCompra()">
       <i class="ti ti-trash"></i> Limpar e nova compra
@@ -978,36 +995,93 @@ function gerarCSV(callback) {
   var freqTokens = calcularFrequencias(produtosTokenizados);
   var nProdutos = produtosTokenizados.length;
 
-  var rows = state.itens.map(function(it) {
-    var valorStr = it.valor < 0
-      ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
-      : it.valor.toFixed(2).replace('.', ',');
-    var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
-    return data + ';' + it.produto + ';' + (it.ean || '') + ';' + it.quantidade + ';' +
-           valorStr + ';' + state.estab + ';' + state.pgto + ';' +
-           sugestoes.join(';');
-  });
-  function montar(lat, lon) {
-    var coordStr = (lat !== null) ? lat.toFixed(6) + ';' + lon.toFixed(6) : ';';
-    var meta = data + ';' + hora + ';' + coordStr;
-    return [meta, header].concat(rows).join('\r\n');
-  }
-  if (navigator.geolocation) {
-    var done = false;
-    var timer = setTimeout(function() {
-      if (!done) { done = true; callback(montar(null, null)); }
-    }, 3000);
-    navigator.geolocation.getCurrentPosition(function(pos) {
-      if (!done) {
-        done = true; clearTimeout(timer);
-        callback(montar(pos.coords.latitude, pos.coords.longitude));
+  lerDicionarioEAN().then(function(dicInfo) {
+    var dict = dicInfo.dict || {};
+
+    var rows = state.itens.map(function(it) {
+      var valorStr = it.valor < 0
+        ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
+        : it.valor.toFixed(2).replace('.', ',');
+      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
+      var ean = it.ean || '';
+
+      // EAN conhecido no dicionário -> prioriza essa associação em SUGESTAO1
+      if (/^[0-9]{8,14}$/.test(ean) && dict[ean]) {
+        var assoc = dict[ean];
+        sugestoes = [assoc].concat(sugestoes.filter(function(s) { return s && s !== assoc; })).slice(0, 3);
+        while (sugestoes.length < 3) sugestoes.push('');
       }
-    }, function() {
-      if (!done) { done = true; clearTimeout(timer); callback(montar(null, null)); }
-    }, { timeout: 3000, maximumAge: 60000 });
-  } else {
-    callback(montar(null, null));
-  }
+
+      return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
+             valorStr + ';' + state.estab + ';' + state.pgto + ';' +
+             sugestoes.join(';');
+    });
+
+    function montar(lat, lon) {
+      var coordStr = (lat !== null) ? lat.toFixed(6) + ';' + lon.toFixed(6) : ';';
+      var meta = data + ';' + hora + ';' + coordStr;
+      return [meta, header].concat(rows).join('\r\n');
+    }
+    if (navigator.geolocation) {
+      var done = false;
+      var timer = setTimeout(function() {
+        if (!done) { done = true; callback(montar(null, null)); }
+      }, 3000);
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        if (!done) {
+          done = true; clearTimeout(timer);
+          callback(montar(pos.coords.latitude, pos.coords.longitude));
+        }
+      }, function() {
+        if (!done) { done = true; clearTimeout(timer); callback(montar(null, null)); }
+      }, { timeout: 3000, maximumAge: 60000 });
+    } else {
+      callback(montar(null, null));
+    }
+  });
+}
+
+// Grava no GitHub novas associações EAN -> produto (usando a melhor sugestão
+// do fuzzy matching), para os itens da compra atual que tenham EAN real e
+// ainda não estejam no dicionário. Não sobrescreve associações existentes.
+function salvarAssociacoesEAN() {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) { toast('Configure o token do GitHub primeiro (ícone GitHub no topo)'); return; }
+  if (state.itens.length === 0) { toast('Nenhum item na compra atual'); return; }
+
+  var produtosTokenizados = state.produtos.map(function(p) {
+    return { nome: p, tokens: tokenizarTexto(p) };
+  });
+  var freqTokens = calcularFrequencias(produtosTokenizados);
+  var nProdutos = produtosTokenizados.length;
+
+  toast('Lendo dicionário EAN...');
+  lerDicionarioEAN().then(function(dicInfo) {
+    var dict = dicInfo.dict || {};
+    var novos = 0;
+
+    state.itens.forEach(function(it) {
+      var ean = it.ean || '';
+      if (!/^[0-9]{8,14}$/.test(ean)) return; // ignora "", "SEM GTIN"
+      if (dict[ean]) return; // já existe — não sobrescreve
+
+      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
+      if (sugestoes[0]) {
+        dict[ean] = sugestoes[0];
+        novos++;
+      }
+    });
+
+    if (novos === 0) {
+      toast('Nenhuma associação nova para salvar.');
+      return;
+    }
+
+    salvarDicionarioEAN(dict, dicInfo.sha).then(function(ok) {
+      if (ok) toast('✓ ' + novos + ' nova(s) associação(ões) salva(s) no dicionário EAN!');
+      else toast('Erro ao salvar no GitHub — verifique o token.', 4000);
+    });
+  });
 }
 
 // Gera nome de arquivo único: estabelecimento + data + hora (evita sobrescrever
@@ -1210,6 +1284,77 @@ function configurarDrive() {
   document.getElementById('inputDriveClient').value = atual;
   show('cardDrive');
   document.getElementById('inputDriveClient').focus();
+}
+
+// ─── DICIONÁRIO EAN — leitura/escrita via GitHub Contents API ────────────────
+var GH_OWNER = 'henriquemattioli-alt';
+var GH_REPO  = 'PAO-DURO';
+var GH_PATH_DICIONARIO_EAN = 'dicionario_ean.csv';
+
+function configurarGithub() {
+  var atual = localStorage.getItem('pd_github_token') || '';
+  document.getElementById('inputGithub').value = atual;
+  show('cardGithub');
+  document.getElementById('inputGithub').focus();
+}
+
+function salvarTokenGithub() {
+  var v = document.getElementById('inputGithub').value.trim();
+  if (!v) { toast('Cole o token'); return; }
+  localStorage.setItem('pd_github_token', v);
+  hide('cardGithub');
+  toast('Token salvo!');
+}
+
+// Lê dicionario_ean.csv do GitHub. Retorna {dict: {EAN: produto}, sha: '...'}.
+// Se o arquivo não existir ainda, retorna dict vazio e sha=null.
+function lerDicionarioEAN() {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) return Promise.resolve({ dict: {}, sha: null, semToken: true });
+
+  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_DICIONARIO_EAN;
+  return fetch(url, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' } })
+    .then(function(r) {
+      if (r.status === 404) return { dict: {}, sha: null };
+      if (!r.ok) throw new Error('GitHub GET HTTP ' + r.status);
+      return r.json().then(function(j) {
+        var conteudo = decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))));
+        var dict = {};
+        conteudo.split(/\r?\n/).forEach(function(linha, idx) {
+          if (idx === 0 || !linha.trim()) return; // pula cabeçalho/linhas vazias
+          var partes = linha.split(';');
+          if (partes.length >= 2 && partes[0].trim()) dict[partes[0].trim()] = partes.slice(1).join(';').trim();
+        });
+        return { dict: dict, sha: j.sha };
+      });
+    })
+    .catch(function(e) { console.warn('lerDicionarioEAN falhou:', e.message); return { dict: {}, sha: null, erro: e.message }; });
+}
+
+// Grava o dicionário atualizado no GitHub (cria ou atualiza dicionario_ean.csv)
+function salvarDicionarioEAN(dict, sha) {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) return Promise.resolve(false);
+
+  var linhas = ['EAN;PRODUTO'];
+  Object.keys(dict).sort().forEach(function(ean) { linhas.push(ean + ';' + dict[ean]); });
+  var conteudo = linhas.join('\r\n') + '\r\n';
+  var b64 = btoa(unescape(encodeURIComponent(conteudo)));
+
+  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_DICIONARIO_EAN;
+  var body = { message: 'Atualiza dicionario_ean.csv via Pão Duro', content: b64 };
+  if (sha) body.sha = sha;
+
+  return fetch(url, {
+    method: 'PUT',
+    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('GitHub PUT HTTP ' + r.status + ': ' + t); });
+    return true;
+  })
+  .catch(function(e) { console.warn('salvarDicionarioEAN falhou:', e.message); return false; });
 }
 
 function salvarChave() {
