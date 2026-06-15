@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v15</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v16</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1609,15 +1609,6 @@ function parsearHtmlSefaz(html) {
 
   var linhas = txt.split(/[\r\n]+/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  // ── DEBUG TEMPORÁRIO: inspecionar linhas com Qtde/unidade ─────────────────────
-  console.log('=== DEBUG QTDE/UNIDADE ===');
-  linhas.forEach(function(l, i) {
-    if (/Qtde\.|^(UN|Kg|Lt|Pc|Cx|G|ml|L):/i.test(l)) {
-      console.log('linha ' + i + ': "' + l + '"  ||  próxima(' + (i+1) + '): "' + (linhas[i+1] || '') + '"');
-    }
-  });
-  console.log('=== FIM DEBUG QTDE/UNIDADE ===');
-
   // Estabelecimento — linha antes do CNPJ
   for (var i = 0; i < Math.min(15, linhas.length); i++) {
     if (/^CNPJ/i.test(linhas[i])) {
@@ -1692,9 +1683,13 @@ function parsearHtmlSefaz(html) {
             var mQ = l.match(/^Qtde\.:(\S+)/i);
             var num = mQ[1].replace(',','.');
             var uni = 'UN';
-            if (j+1 < linhas.length && /^(UN|Kg|Lt|Pc|Cx|G|ml|L):/i.test(linhas[j+1])) {
-              uni = linhas[j+1].split(':')[0].trim().toUpperCase();
-              j++;
+            if (j+1 < linhas.length) {
+              // Linha seguinte é sempre "UN: <unidade real>" — ex: "UN: Kg", "UN: Un", "UN: PC"
+              var mUni = linhas[j+1].match(/^UN:\s*(.+)$/i);
+              if (mUni) {
+                uni = mUni[1].trim().toUpperCase();
+                j++;
+              }
             }
             qtd = num + ' ' + uni;
           }
