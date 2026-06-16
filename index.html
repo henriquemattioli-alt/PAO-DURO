@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v20</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v21</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -938,7 +938,7 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
   qtd = qtd || 3;
   var tokensLido = [];
   tokenizarTexto(descricaoLida).forEach(function(t) {
-    if (t.length >= 4 && tokensLido.indexOf(t) === -1) tokensLido.push(t);
+    if (t.length >= 3 && tokensLido.indexOf(t) === -1) tokensLido.push(t);
   });
   tokensLido.sort(function(a, b) { return b.length - a.length; });
 
@@ -946,14 +946,19 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
   var total = tokensLido.length;
 
   var scores = produtosTokenizados.map(function(p) {
-    var base = 0, matched = 0;
+    var base = 0, matched = 0, matchExatos = 0;
+    // Primeira passagem: conta matches exatos (âncoras)
+    tokensLido.forEach(function(tk) {
+      if (p.tokens.indexOf(tk) !== -1) matchExatos++;
+    });
     tokensLido.forEach(function(tk) {
       if (p.tokens.indexOf(tk) !== -1) {
-        base += pesoToken(tk, tk, TIER_EXATO, freq, N); // match exato
+        base += pesoToken(tk, tk, TIER_EXATO, freq, N);
         matched++;
         return;
       }
-      if (tk.length < 4) return;
+      // Token de 3 letras em prefixo/subseq só vale se há âncora exata de outro token neste produto
+      if (tk.length < 4 && matchExatos === 0) return;
       // match de prefixo: palavra do produto começa com a abreviação lida
       // (ex: "sard" -> "sardinha", "refri" -> "refrigerantes")
       for (var i = 0; i < p.tokens.length; i++) {
