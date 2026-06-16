@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v17</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v20</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -250,7 +250,7 @@
     <div id="manualPgto" style="margin-top:8px">
       <div class="field">
         <label>Buscar forma de pagamento</label>
-        <input type="text" id="pgtoBusca" placeholder="Digite para filtrar..." oninput="filtrarPgto(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
+        <input type="text" id="pgtoBusca" placeholder="Digite para filtrar..." oninput="filtrarPgto(this.value)" onfocus="filtrarPgto(this.value)" autocomplete="off" style="margin-bottom:6px;font-size:13px">
         <div id="pgtoLista" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);display:none"></div>
       </div>
       <div class="field">
@@ -938,7 +938,7 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
   qtd = qtd || 3;
   var tokensLido = [];
   tokenizarTexto(descricaoLida).forEach(function(t) {
-    if (t.length >= 2 && tokensLido.indexOf(t) === -1) tokensLido.push(t);
+    if (t.length >= 4 && tokensLido.indexOf(t) === -1) tokensLido.push(t);
   });
   tokensLido.sort(function(a, b) { return b.length - a.length; });
 
@@ -953,7 +953,7 @@ function sugerirProdutos(descricaoLida, produtosTokenizados, freq, N, qtd) {
         matched++;
         return;
       }
-      if (tk.length < 3) return;
+      if (tk.length < 4) return;
       // match de prefixo: palavra do produto começa com a abreviação lida
       // (ex: "sard" -> "sardinha", "refri" -> "refrigerantes")
       for (var i = 0; i < p.tokens.length; i++) {
