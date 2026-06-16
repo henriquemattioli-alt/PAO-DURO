@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">15/06 · v16</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v17</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -711,6 +711,10 @@ function setEstab(nome, cidade) {
   show('estabConfirmado');
   setGpsStatus('ok', nome);
   toast('Estabelecimento definido!');
+  // Mostra o card de pagamento se ainda não foi selecionado
+  if (!state.pgto) {
+    show('cardPagamento'); hide('confirmPgto'); show('manualPgto'); hide('pgtoConfirmado');
+  }
 }
 
 function trocarEstab() { hide('estabConfirmado'); hide('confirmEstab'); show('manualEstab'); }
