@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v21</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v22</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1740,9 +1740,13 @@ function aplicarResultadoSefaz(parsed, urlOriginal) {
   // Pagamento já foi selecionado pelo usuário antes — não sobrescreve
   if (parsed.itens && parsed.itens.length > 0) {
     state.itens = parsed.itens;
-    // Adiciona linha de desconto se houver
+    // Desconto: se só 1 item real, subtrai direto no valor; senão adiciona linha separada
     if (parsed.desconto && parsed.desconto > 0) {
-      state.itens.push({ produto: 'Credito em Descontos', quantidade: '1 UN', valor: -parsed.desconto });
+      if (state.itens.length === 1) {
+        state.itens[0].valor = Math.max(0, state.itens[0].valor - parsed.desconto);
+      } else {
+        state.itens.push({ produto: 'Credito em Descontos', quantidade: '1 UN', valor: -parsed.desconto });
+      }
     }
     save(); renderItens(); show('cardItens'); show('cardExport'); atualizarTotais();
     toast('✓ ' + state.itens.length + ' itens extraidos da SEFAZ!');
