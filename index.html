@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v33</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v34</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1004,7 +1004,7 @@ function gerarCSV(callback) {
   var agora = new Date();
   var data  = agora.toLocaleDateString('pt-BR');
   var hora  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  var header = 'DATA;PRODUTO;EAN;QUANTIDADE;VALOR;SUGESTAO1;SUGESTAO2;SUGESTAO3';
+  var header = 'DATA;PRODUTO;EAN;QUANTIDADE;VALOR;SUGESTAO1';
 
   var produtosTokenizados = state.produtos.map(function(p) {
     return { nome: p, tokens: tokenizarTexto(p) };
@@ -1019,14 +1019,12 @@ function gerarCSV(callback) {
       var valorStr = it.valor < 0
         ? '-' + Math.abs(it.valor).toFixed(2).replace('.', ',')
         : it.valor.toFixed(2).replace('.', ',');
-      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
+      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 1);
       var ean = it.ean || 'SEM GTIN';
 
       // EAN conhecido no dicionário -> prioriza essa associação em SUGESTAO1
       if (/^[0-9]{8,14}$/.test(ean) && dict[normChave(ean)]) {
-        var assoc = dict[normChave(ean)];
-        sugestoes = [assoc].concat(sugestoes.filter(function(s) { return s && s !== assoc; })).slice(0, 3);
-        while (sugestoes.length < 3) sugestoes.push('');
+        sugestoes = [dict[normChave(ean)]];
       }
 
       // SEM GTIN: chave = primeiros 3 tokens se soma de letras < 13, senão 2 primeiros
@@ -1034,15 +1032,11 @@ function gerarCSV(callback) {
         var tokens3 = it.produto.trim().split(/\s+/).slice(0, 3);
         var soma = tokens3.reduce(function(acc, t) { return acc + t.length; }, 0);
         var chave = normChave((soma < 13 ? tokens3 : tokens3.slice(0, 2)).join(' '));
-        var assocSG = dict[chave];
-        if (assocSG) {
-          sugestoes = [assocSG].concat(sugestoes.filter(function(s) { return s && s !== assocSG; })).slice(0, 3);
-          while (sugestoes.length < 3) sugestoes.push('');
-        }
+        if (dict[chave]) sugestoes = [dict[chave]];
       }
 
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
-             valorStr + ';' + sugestoes.map(function(s) { return s ? normChave(s) : ''; }).join(';');
+             valorStr + ';' + normChave(sugestoes[0] || '');
     });
 
     // Grava automaticamente EANs novos no arquivo de pendentes (em background)
