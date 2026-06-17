@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v25</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v27</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1024,12 +1024,14 @@ function gerarCSV(callback) {
         while (sugestoes.length < 3) sugestoes.push('');
       }
 
-      // SEM GTIN: tenta os primeiros 3 tokens da descrição como chave no dicionário
+      // SEM GTIN: chave = primeiros 3 tokens se soma de letras < 13, senão 2 primeiros
       if (ean === 'SEM GTIN') {
-        var chave3 = it.produto.trim().split(/\s+/).slice(0, 3).join(' ');
-        if (dict[chave3]) {
-          var assoc3 = dict[chave3];
-          sugestoes = [assoc3].concat(sugestoes.filter(function(s) { return s && s !== assoc3; })).slice(0, 3);
+        var tokens3 = it.produto.trim().split(/\s+/).slice(0, 3);
+        var soma = tokens3.reduce(function(acc, t) { return acc + t.length; }, 0);
+        var chave = (soma < 13 ? tokens3 : tokens3.slice(0, 2)).join(' ');
+        if (dict[chave]) {
+          var assocSG = dict[chave];
+          sugestoes = [assocSG].concat(sugestoes.filter(function(s) { return s && s !== assocSG; })).slice(0, 3);
           while (sugestoes.length < 3) sugestoes.push('');
         }
       }
@@ -1037,6 +1039,9 @@ function gerarCSV(callback) {
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
              valorStr + ';' + sugestoes.join(';');
     });
+
+    // Grava automaticamente EANs novos no arquivo de pendentes (em background)
+    gravarPendentesEAN(dict);
 
     function montar(lat, lon) {
       var coordStr = (lat !== null) ? lat.toFixed(6) + ';' + lon.toFixed(6) : ';';
@@ -1347,6 +1352,7 @@ function configurarDrive() {
 var GH_OWNER = 'henriquemattioli-alt';
 var GH_REPO  = 'PAO-DURO';
 var GH_PATH_DICIONARIO_EAN = 'dicionario_ean.csv';
+var GH_PATH_PENDENTES = 'dicionario_ean_pendentes.csv';
 
 function configurarGithub() {
   var atual = localStorage.getItem('pd_github_token') || '';
@@ -1412,6 +1418,91 @@ function salvarDicionarioEAN(dict, sha) {
     return true;
   })
   .catch(function(e) { console.warn('salvarDicionarioEAN falhou:', e.message); return false; });
+}
+
+// ─── PENDENTES EAN ────────────────────────────────────────────────────────────
+// Lê dicionario_ean_pendentes.csv do GitHub (mesmo formato EAN;PRODUTO)
+function lerPendentesEAN() {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) return Promise.resolve({ dict: {}, sha: null });
+  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_PENDENTES;
+  return fetch(url, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' } })
+    .then(function(r) {
+      if (r.status === 404) return { dict: {}, sha: null };
+      if (!r.ok) throw new Error('GitHub GET pendentes HTTP ' + r.status);
+      return r.json().then(function(j) {
+        var conteudo = decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))));
+        var dict = {};
+        conteudo.split(/\r?\n/).forEach(function(linha, idx) {
+          if (idx === 0 || !linha.trim()) return;
+          var partes = linha.split(';');
+          if (partes.length >= 2 && partes[0].trim()) dict[partes[0].trim()] = partes.slice(1).join(';').trim();
+        });
+        return { dict: dict, sha: j.sha };
+      });
+    })
+    .catch(function(e) { console.warn('lerPendentesEAN falhou:', e.message); return { dict: {}, sha: null }; });
+}
+
+// Grava dicionario_ean_pendentes.csv no GitHub
+function salvarPendentesEAN(dict, sha) {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) return Promise.resolve(false);
+  var linhas = ['EAN;PRODUTO'];
+  Object.keys(dict).sort().forEach(function(ean) { linhas.push(ean + ';' + dict[ean]); });
+  var conteudo = linhas.join('\r\n') + '\r\n';
+  var b64 = btoa(unescape(encodeURIComponent(conteudo)));
+  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_PENDENTES;
+  var body = { message: 'Atualiza pendentes EAN via Pão Duro', content: b64 };
+  if (sha) body.sha = sha;
+  return fetch(url, {
+    method: 'PUT',
+    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('GitHub PUT pendentes HTTP ' + r.status + ': ' + t); });
+    return true;
+  })
+  .catch(function(e) { console.warn('salvarPendentesEAN falhou:', e.message); return false; });
+}
+
+// Após gerar o CSV, grava automaticamente no pendentes os EANs novos
+// (não cadastrados no dicionário oficial) com a melhor sugestão fuzzy.
+// Não sobrescreve entradas já existentes no pendentes.
+function gravarPendentesEAN(dictOficial) {
+  var token = localStorage.getItem('pd_github_token') || '';
+  if (!token) return; // silencioso se não tiver token
+
+  var produtosTokenizados = state.produtos.map(function(p) {
+    return { nome: p, tokens: tokenizarTexto(p) };
+  });
+  var freqTokens = calcularFrequencias(produtosTokenizados);
+  var nProdutos = produtosTokenizados.length;
+
+  // Coleta EANs novos desta compra (numéricos, não no dicionário oficial)
+  var novosEAN = {};
+  state.itens.forEach(function(it) {
+    var ean = it.ean || '';
+    if (!/^[0-9]{8,14}$/.test(ean)) return;
+    if (dictOficial[ean]) return; // já no dicionário oficial
+    var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 1);
+    if (sugestoes[0]) novosEAN[ean] = sugestoes[0];
+  });
+
+  if (Object.keys(novosEAN).length === 0) return;
+
+  lerPendentesEAN().then(function(pInfo) {
+    var pDict = pInfo.dict || {};
+    var adicionados = 0;
+    Object.keys(novosEAN).forEach(function(ean) {
+      if (!pDict[ean]) { pDict[ean] = novosEAN[ean]; adicionados++; }
+    });
+    if (adicionados === 0) return;
+    salvarPendentesEAN(pDict, pInfo.sha).then(function(ok) {
+      if (ok) toast('📋 ' + adicionados + ' EAN(s) novo(s) adicionado(s) aos pendentes');
+    });
+  });
 }
 
 function salvarChave() {
