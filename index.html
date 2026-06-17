@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v27</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v28</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1069,9 +1069,9 @@ function gerarCSV(callback) {
   });
 }
 
-// Grava no GitHub novas associações EAN -> produto (usando a melhor sugestão
+// Grava no GitHub pendentes EAN -> produto (usando a melhor sugestão
 // do fuzzy matching), para os itens da compra atual que tenham EAN real e
-// ainda não estejam no dicionário. Não sobrescreve associações existentes.
+// ainda não estejam no dicionário oficial nem nos pendentes.
 function salvarAssociacoesEAN() {
   var token = localStorage.getItem('pd_github_token') || '';
   if (!token) { toast('Configure o token do GitHub primeiro (ícone GitHub no topo)'); return; }
@@ -1083,19 +1083,24 @@ function salvarAssociacoesEAN() {
   var freqTokens = calcularFrequencias(produtosTokenizados);
   var nProdutos = produtosTokenizados.length;
 
-  toast('Lendo dicionário EAN...');
-  lerDicionarioEAN().then(function(dicInfo) {
-    var dict = dicInfo.dict || {};
+  toast('Lendo dicionários...');
+
+  // Lê oficial + pendentes em paralelo
+  Promise.all([lerDicionarioEAN(), lerPendentesEAN()]).then(function(results) {
+    var dictOficial  = results[0].dict || {};
+    var dictPend     = results[1].dict || {};
+    var shaPend      = results[1].sha;
     var novos = 0;
 
     state.itens.forEach(function(it) {
       var ean = it.ean || '';
-      if (!/^[0-9]{8,14}$/.test(ean)) return; // ignora "", "SEM GTIN"
-      if (dict[ean]) return; // já existe — não sobrescreve
+      if (!/^[0-9]{8,14}$/.test(ean)) return;
+      if (dictOficial[ean]) return; // já no oficial
+      if (dictPend[ean]) return;    // já nos pendentes
 
-      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 3);
+      var sugestoes = sugerirProdutos(it.produto, produtosTokenizados, freqTokens, nProdutos, 1);
       if (sugestoes[0]) {
-        dict[ean] = sugestoes[0];
+        dictPend[ean] = sugestoes[0];
         novos++;
       }
     });
@@ -1105,8 +1110,8 @@ function salvarAssociacoesEAN() {
       return;
     }
 
-    salvarDicionarioEAN(dict, dicInfo.sha).then(function(ok) {
-      if (ok) toast('✓ ' + novos + ' nova(s) associação(ões) salva(s) no dicionário EAN!');
+    salvarPendentesEAN(dictPend, shaPend).then(function(ok) {
+      if (ok) toast('📋 ' + novos + ' nova(s) associação(ões) salva(s) nos pendentes!');
       else toast('Erro ao salvar no GitHub — verifique o token.', 4000);
     });
   });
