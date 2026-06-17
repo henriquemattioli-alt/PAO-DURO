@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v24</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">16/06 · v25</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1022,6 +1022,16 @@ function gerarCSV(callback) {
         var assoc = dict[ean];
         sugestoes = [assoc].concat(sugestoes.filter(function(s) { return s && s !== assoc; })).slice(0, 3);
         while (sugestoes.length < 3) sugestoes.push('');
+      }
+
+      // SEM GTIN: tenta os primeiros 3 tokens da descrição como chave no dicionário
+      if (ean === 'SEM GTIN') {
+        var chave3 = it.produto.trim().split(/\s+/).slice(0, 3).join(' ');
+        if (dict[chave3]) {
+          var assoc3 = dict[chave3];
+          sugestoes = [assoc3].concat(sugestoes.filter(function(s) { return s && s !== assoc3; })).slice(0, 3);
+          while (sugestoes.length < 3) sugestoes.push('');
+        }
       }
 
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
