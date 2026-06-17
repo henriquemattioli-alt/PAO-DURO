@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v29</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v32</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -897,6 +897,11 @@ function tokenizarTexto(str) {
   return norm.split(/\s+/).filter(function(t) { return t.length > 0; });
 }
 
+// Normalização de chave: uppercase + sem acentos — padrão único para dicionário
+function normChave(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+}
+
 // Verifica se 'small' aparece como subsequência (na ordem, não contígua) em 'big'
 function isSubseq(small, big) {
   var j = 0;
@@ -1018,8 +1023,8 @@ function gerarCSV(callback) {
       var ean = it.ean || 'SEM GTIN';
 
       // EAN conhecido no dicionário -> prioriza essa associação em SUGESTAO1
-      if (/^[0-9]{8,14}$/.test(ean) && dict[ean]) {
-        var assoc = dict[ean];
+      if (/^[0-9]{8,14}$/.test(ean) && dict[normChave(ean)]) {
+        var assoc = dict[normChave(ean)];
         sugestoes = [assoc].concat(sugestoes.filter(function(s) { return s && s !== assoc; })).slice(0, 3);
         while (sugestoes.length < 3) sugestoes.push('');
       }
@@ -1028,16 +1033,16 @@ function gerarCSV(callback) {
       if (ean === 'SEM GTIN') {
         var tokens3 = it.produto.trim().split(/\s+/).slice(0, 3);
         var soma = tokens3.reduce(function(acc, t) { return acc + t.length; }, 0);
-        var chave = (soma < 13 ? tokens3 : tokens3.slice(0, 2)).join(' ');
-        if (dict[chave]) {
-          var assocSG = dict[chave];
+        var chave = normChave((soma < 13 ? tokens3 : tokens3.slice(0, 2)).join(' '));
+        var assocSG = dict[chave];
+        if (assocSG) {
           sugestoes = [assocSG].concat(sugestoes.filter(function(s) { return s && s !== assocSG; })).slice(0, 3);
           while (sugestoes.length < 3) sugestoes.push('');
         }
       }
 
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
-             valorStr + ';' + sugestoes.join(';');
+             valorStr + ';' + sugestoes.map(function(s) { return s ? normChave(s) : ''; }).join(';');
     });
 
     // Grava automaticamente EANs novos no arquivo de pendentes (em background)
@@ -1389,7 +1394,7 @@ function lerDicionarioEAN() {
         txt.split(/\r?\n/).forEach(function(linha, idx) {
           if (idx === 0 || !linha.trim()) return;
           var partes = linha.split(';');
-          if (partes.length >= 2 && partes[0].trim()) dict[partes[0].trim()] = partes.slice(1).join(';').trim();
+          if (partes.length >= 2 && partes[0].trim()) dict[normChave(partes[0])] = partes.slice(1).join(';').trim();
         });
         // sha não disponível via raw — busca via API só quando precisar gravar
         return { dict: dict, sha: null, semToken: !token };
