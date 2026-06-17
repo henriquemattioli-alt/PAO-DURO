@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v28</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v29</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1378,22 +1378,21 @@ function salvarTokenGithub() {
 // Se o arquivo não existir ainda, retorna dict vazio e sha=null.
 function lerDicionarioEAN() {
   var token = localStorage.getItem('pd_github_token') || '';
-  if (!token) return Promise.resolve({ dict: {}, sha: null, semToken: true });
-
-  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_DICIONARIO_EAN;
-  return fetch(url, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' } })
+  // Leitura via raw (mais rápida, sem rate limit) — token só necessário para escrita
+  var url = 'https://raw.githubusercontent.com/' + GH_OWNER + '/' + GH_REPO + '/main/' + GH_PATH_DICIONARIO_EAN;
+  return fetch(url + '?t=' + Date.now()) // cache-busting
     .then(function(r) {
       if (r.status === 404) return { dict: {}, sha: null };
-      if (!r.ok) throw new Error('GitHub GET HTTP ' + r.status);
-      return r.json().then(function(j) {
-        var conteudo = decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))));
+      if (!r.ok) throw new Error('GitHub raw GET HTTP ' + r.status);
+      return r.text().then(function(txt) {
         var dict = {};
-        conteudo.split(/\r?\n/).forEach(function(linha, idx) {
-          if (idx === 0 || !linha.trim()) return; // pula cabeçalho/linhas vazias
+        txt.split(/\r?\n/).forEach(function(linha, idx) {
+          if (idx === 0 || !linha.trim()) return;
           var partes = linha.split(';');
           if (partes.length >= 2 && partes[0].trim()) dict[partes[0].trim()] = partes.slice(1).join(';').trim();
         });
-        return { dict: dict, sha: j.sha };
+        // sha não disponível via raw — busca via API só quando precisar gravar
+        return { dict: dict, sha: null, semToken: !token };
       });
     })
     .catch(function(e) { console.warn('lerDicionarioEAN falhou:', e.message); return { dict: {}, sha: null, erro: e.message }; });
@@ -1408,21 +1407,29 @@ function salvarDicionarioEAN(dict, sha) {
   Object.keys(dict).sort().forEach(function(ean) { linhas.push(ean + ';' + dict[ean]); });
   var conteudo = linhas.join('\r\n') + '\r\n';
   var b64 = btoa(unescape(encodeURIComponent(conteudo)));
+  var apiUrl = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_DICIONARIO_EAN;
 
-  var url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + GH_PATH_DICIONARIO_EAN;
-  var body = { message: 'Atualiza dicionario_ean.csv via Pão Duro', content: b64 };
-  if (sha) body.sha = sha;
+  // Se sha não disponível (leitura foi via raw), busca via API antes de gravar
+  var getSha = sha
+    ? Promise.resolve(sha)
+    : fetch(apiUrl, { headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json' } })
+        .then(function(r) { return r.ok ? r.json().then(function(j) { return j.sha; }) : null; })
+        .catch(function() { return null; });
 
-  return fetch(url, {
-    method: 'PUT',
-    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  .then(function(r) {
-    if (!r.ok) return r.text().then(function(t) { throw new Error('GitHub PUT HTTP ' + r.status + ': ' + t); });
-    return true;
-  })
-  .catch(function(e) { console.warn('salvarDicionarioEAN falhou:', e.message); return false; });
+  return getSha.then(function(shaFinal) {
+    var body = { message: 'Atualiza dicionario_ean.csv via Pão Duro', content: b64 };
+    if (shaFinal) body.sha = shaFinal;
+    return fetch(apiUrl, {
+      method: 'PUT',
+      headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    .then(function(r) {
+      if (!r.ok) return r.text().then(function(t) { throw new Error('GitHub PUT HTTP ' + r.status + ': ' + t); });
+      return true;
+    })
+    .catch(function(e) { console.warn('salvarDicionarioEAN falhou:', e.message); return false; });
+  });
 }
 
 // ─── PENDENTES EAN ────────────────────────────────────────────────────────────
