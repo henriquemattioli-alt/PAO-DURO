@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v34</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v35</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1046,7 +1046,10 @@ function gerarCSV(callback) {
       var coordStr = (lat !== null) ? lat.toFixed(6) + ';' + lon.toFixed(6) : ';';
       var meta = data + ';' + hora + ';' + coordStr;
       // Estabelecimento e Pagamento no cabeçalho (invariáveis por cupom)
-      var cabecalho = 'ESTABELECIMENTO;' + state.estab + '\r\nPAGAMENTO;' + state.pgto;
+      var cabecalhoEstab = state.estabSefaz
+        ? 'ESTABELECIMENTO LIDO;' + state.estabSefaz + '\r\nESTABELECIMENTO;' + state.estab
+        : 'ESTABELECIMENTO;' + state.estab;
+      var cabecalho = cabecalhoEstab + '\r\nPAGAMENTO;' + state.pgto;
       return [meta, cabecalho, header].concat(rows).join('\r\n');
     }
     if (navigator.geolocation) {
@@ -1861,6 +1864,8 @@ function capNome(txt) {
 }
 
 function aplicarResultadoSefaz(parsed, urlOriginal) {
+  // Guarda o nome lido da SEFAZ para o cabeçalho do CSV
+  if (parsed.estabelecimento) state.estabSefaz = parsed.estabelecimento;
   // Estabelecimento — confirma se não foi definido ainda
   if (!state.estab && parsed.estabelecimento) mostrarConfirmEstab(parsed.estabelecimento, '');
   // Pagamento já foi selecionado pelo usuário antes — não sobrescreve
