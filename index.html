@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">17/06 · v35</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">18/06 · v36</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1029,10 +1029,17 @@ function gerarCSV(callback) {
 
       // SEM GTIN: chave = primeiros 3 tokens se soma de letras < 13, senão 2 primeiros
       if (ean === 'SEM GTIN') {
-        var tokens3 = it.produto.trim().split(/\s+/).slice(0, 3);
-        var soma = tokens3.reduce(function(acc, t) { return acc + t.length; }, 0);
-        var chave = normChave((soma < 13 ? tokens3 : tokens3.slice(0, 2)).join(' '));
-        if (dict[chave]) sugestoes = [dict[chave]];
+        var tokensAll = it.produto.trim().split(/\s+/);
+        var tokensFilt = tokensAll.filter(function(t) { return t.length > 2; }).slice(0, 3);
+        if (tokensFilt.length === 0) tokensFilt = tokensAll.slice(0, 3);
+        var soma = tokensFilt.reduce(function(acc, t) { return acc + t.length; }, 0);
+        var chave = normChave((soma < 13 ? tokensFilt : tokensFilt.slice(0, 2)).join(' '));
+        // Tenta também com os 3 primeiros tokens originais (sem filtrar curtos)
+        var tokens3orig = tokensAll.slice(0, 3);
+        var somaOrig = tokens3orig.reduce(function(acc, t) { return acc + t.length; }, 0);
+        var chaveOrig = normChave((somaOrig < 13 ? tokens3orig : tokens3orig.slice(0, 2)).join(' '));
+        var assocSG = dict[chave] || dict[chaveOrig];
+        if (assocSG) sugestoes = [assocSG];
       }
 
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
