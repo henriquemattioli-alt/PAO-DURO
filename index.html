@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">18/06 · v36</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v37</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1602,42 +1602,93 @@ function lerQRDeFoto(e) {
 }
 
 function lerComNimiq(file) {
-  if (!window.QrScanner) {
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.umd.min.js';
-    script.onload = function() { fazerScanNimiq(file); };
-    script.onerror = function() {
-      hide('cupomProcessando');
-      toast('Erro ao carregar leitor QR.', 3000);
-    };
-    document.head.appendChild(script);
-  } else {
-    fazerScanNimiq(file);
+  // Carrega zbar-wasm via CDN (ES module) — muito mais preciso que o Nimiq
+  if (window._zbarWasmLoaded) {
+    fazerScanZbar(file);
+    return;
   }
+  // Injeta script de bootstrap para importar o módulo ES
+  var script = document.createElement('script');
+  script.type = 'module';
+  script.textContent = [
+    'import { scanImageData } from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/main.js";',
+    'window._zbarScanImageData = scanImageData;',
+    'window._zbarWasmLoaded = true;',
+    'window.dispatchEvent(new Event("zbar-ready"));'
+  ].join('\n');
+  document.head.appendChild(script);
+
+  window.addEventListener('zbar-ready', function() {
+    fazerScanZbar(file);
+  }, { once: true });
+
+  // Timeout de segurança
+  setTimeout(function() {
+    if (!window._zbarWasmLoaded) {
+      hide('cupomProcessando');
+      toast('Erro ao carregar leitor QR. Cole a URL manualmente.', 4000);
+      mostrarCampoManual();
+    }
+  }, 10000);
 }
 
-function fazerScanNimiq(file) {
-  QrScanner.scanImage(file, { returnDetailedScanResult: true })
-    .then(function(result) {
+function fazerScanZbar(file) {
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+
+  img.onload = function() {
+    // Redimensiona pra no máximo 1200px (suficiente pra QR code, mais rápido)
+    var max = 1200;
+    var w = img.width, h = img.height;
+    if (w > max || h > max) {
+      var ratio = Math.min(max/w, max/h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+    }
+    canvas.width = w; canvas.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+
+    var imageData = ctx.getImageData(0, 0, w, h);
+    window._zbarScanImageData(imageData).then(function(symbols) {
       hide('cupomProcessando');
-      var url = result.data;
-      console.log('QrScanner leu:', url);
-      if (url && url.startsWith('http')) {
-        document.getElementById('cupomProcessando').innerHTML =
-          '<span class="spinner"></span> Buscando dados na SEFAZ...';
-        show('cupomProcessando');
-        tentarProxies(url);
+      if (symbols && symbols.length > 0) {
+        var qr = symbols[0].decode();
+        console.log('zbar-wasm leu:', qr);
+        if (qr && qr.startsWith('http')) {
+          document.getElementById('cupomProcessando').innerHTML =
+            '<span class="spinner"></span> Buscando dados na SEFAZ...';
+          show('cupomProcessando');
+          tentarProxies(qr);
+        } else {
+          toast('QR lido mas URL invalida: ' + qr, 4000);
+          mostrarCampoManual();
+        }
       } else {
-        toast('QR lido mas URL invalida: ' + url, 4000);
+        console.warn('zbar-wasm: nenhum QR encontrado');
+        toast('Nao consegui ler o QR. Cole a URL manualmente.', 4000);
         mostrarCampoManual();
       }
-    })
-    .catch(function(err) {
+    }).catch(function(err) {
       hide('cupomProcessando');
-      console.warn('QrScanner erro:', err);
+      console.warn('zbar-wasm erro:', err);
       mostrarCampoManual();
     });
+  };
+
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
+    hide('cupomProcessando');
+    toast('Erro ao carregar imagem.', 3000);
+    mostrarCampoManual();
+  };
+
+  img.src = url;
 }
+
+function fazerScanNimiq(file) { lerComNimiq(file); } // compatibilidade
 
 function mostrarCampoManual() {
   show('cardChaveAcesso');
