@@ -136,7 +136,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v47</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v48</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1031,7 +1031,7 @@ function gerarCSV(callback) {
   var agora = new Date();
   var data  = agora.toLocaleDateString('pt-BR');
   var hora  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  var header = 'DATA;PRODUTO;EAN;QUANTIDADE;VALOR;SUGESTAO1';
+  var header = 'DATA;PRODUTO;EAN;QUANTIDADE;VALOR;ESTABELECIMENTO;PAGAMENTO;SUGESTAO1';
 
   var produtosTokenizados = state.produtos.map(function(p) {
     return { nome: p, tokens: tokenizarTexto(p) };
@@ -1070,7 +1070,7 @@ function gerarCSV(callback) {
       }
 
       return data + ';' + it.produto + ';' + ean + ';' + it.quantidade + ';' +
-             valorStr + ';' + normChave(sugestoes[0] || '');
+             valorStr + ';' + state.estab + ';' + state.pgto + ';' + normChave(sugestoes[0] || '');
     });
 
     // Grava automaticamente EANs novos no arquivo de pendentes (em background)
