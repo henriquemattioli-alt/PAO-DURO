@@ -1,4 +1,4 @@
-var CACHE_VERSION = 'v42'
+var CACHE_VERSION = 'v43'
 
 self.addEventListener('install', function(e) {
   self.skipWaiting(); // Ativa imediatamente sem esperar abas fecharem
