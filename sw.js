@@ -1,22 +1,19 @@
-var CACHE_VERSION = 'v43'
-
-self.addEventListener('install', function(e) {
-  self.skipWaiting(); // Ativa imediatamente sem esperar abas fecharem
+// v43 — Service Worker minimalista: sem cache, auto-destruição
+self.addEventListener('install', function() {
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', function(e) {
-  // Apaga TODOS os caches antigos ao ativar nova versão
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.map(function(k) {
-        return caches.delete(k);
-      }));
+      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
-      return self.clients.claim(); // Assume controle de todas as abas abertas
+      return self.clients.claim();
     })
   );
 });
 
-// Sem interceptação de fetch — deixa tudo passar direto para a rede
-// Isso garante que o index.html sempre vem fresco do GitHub Pages
-
+// Passa TUDO direto para a rede — nunca cacheia nada
+self.addEventListener('fetch', function(e) {
+  e.respondWith(fetch(e.request));
+});
