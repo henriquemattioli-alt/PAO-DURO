@@ -10,6 +10,7 @@
   <title>Pão Duro — Compras</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js"></script>
   <style>
     :root {
       --green: #3B6D11; --green-light: #EAF3DE; --green-mid: #639922;
@@ -135,7 +136,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v45</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v46</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1655,57 +1656,37 @@ function iniciarCameraQR() {
   var container = document.getElementById('qrCameraContainer');
   var video = document.getElementById('qrVideo');
 
-  function comecarCamera() {
-    container.style.display = 'block';
-    document.getElementById('btnQR').style.display = 'none';
-    _qrScanning = true;
-
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-    }).then(function(stream) {
-      _qrStream = stream;
-      // Tenta aplicar zoom 2x via track constraints (suportado em Chrome/Android)
-      var track = stream.getVideoTracks()[0];
-      if (track) {
-        var caps = track.getCapabilities ? track.getCapabilities() : {};
-        if (caps.zoom && caps.zoom.max >= 2) {
-          track.applyConstraints({ advanced: [{ zoom: 2 }] }).catch(function(){});
-        }
-      }
-      video.srcObject = stream;
-      video.play();
-      video.addEventListener('loadedmetadata', function() {
-        _processarFrameQR();
-      }, { once: true });
-    }).catch(function(err) {
-      pararCameraQR();
-      toast('Câmera não disponível: ' + err.message, 4000);
-      mostrarCampoManual();
-    });
+  if (typeof zbarWasm === 'undefined' || !zbarWasm.scanImageData) {
+    toast('Leitor QR não disponível. Use a URL manual.', 4000);
+    mostrarCampoManual();
+    return;
   }
 
-  if (window._zbarWasmLoaded) {
-    comecarCamera();
-  } else {
-    toast('Carregando leitor QR...', 2000);
-    var script = document.createElement('script');
-    script.type = 'module';
-    script.textContent = [
-      'import * as zbarWasm from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js";',
-      'window._zbarScanImageData = zbarWasm.scanImageData;',
-      'window._zbarWasmLoaded = true;',
-      'console.log("zbar carregado, scanImageData:", typeof zbarWasm.scanImageData);',
-      'window.dispatchEvent(new Event("zbar-ready"));'
-    ].join('\n');
-    document.head.appendChild(script);
-    window.addEventListener('zbar-ready', function() { comecarCamera(); }, { once: true });
-    setTimeout(function() {
-      if (!window._zbarWasmLoaded) {
-        toast('Erro ao carregar leitor. Use a URL manual.', 4000);
-        mostrarCampoManual();
+  container.style.display = 'block';
+  document.getElementById('btnQR').style.display = 'none';
+  _qrScanning = true;
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+  }).then(function(stream) {
+    _qrStream = stream;
+    var track = stream.getVideoTracks()[0];
+    if (track) {
+      var caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.zoom && caps.zoom.max >= 2) {
+        track.applyConstraints({ advanced: [{ zoom: 2 }] }).catch(function(){});
       }
-    }, 10000);
-  }
+    }
+    video.srcObject = stream;
+    video.play();
+    video.addEventListener('loadedmetadata', function() {
+      _processarFrameQR();
+    }, { once: true });
+  }).catch(function(err) {
+    pararCameraQR();
+    toast('Câmera não disponível: ' + err.message, 4000);
+    mostrarCampoManual();
+  });
 }
 
 function _processarFrameQR() {
@@ -1727,15 +1708,15 @@ function _processarFrameQR() {
   var qrStatus = document.getElementById('qrStatus');
   var qrDebug = document.getElementById('qrDebug');
 
-  if (!window._zbarScanImageData) {
-    if (qrDebug) qrDebug.textContent = 'ERRO: _zbarScanImageData nao disponivel!';
+  if (!zbarWasm || !zbarWasm.scanImageData) {
+    if (qrDebug) qrDebug.textContent = 'ERRO: zbarWasm nao disponivel!';
     _qrAnimFrame = setTimeout(_processarFrameQR, 500);
     return;
   }
 
   if (qrDebug) qrDebug.textContent = 'Frame: ' + canvas.width + 'x' + canvas.height + ' | zbar: OK';
 
-  window._zbarScanImageData(imageData).then(function(symbols) {
+  zbarWasm.scanImageData(imageData).then(function(symbols) {
     if (!_qrScanning) return;
     if (qrDebug) qrDebug.textContent = 'Symbols: ' + (symbols ? symbols.length : 0) + ' | ' + canvas.width + 'x' + canvas.height;
     if (symbols && symbols.length > 0) {
