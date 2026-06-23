@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v43</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v44</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -305,6 +305,9 @@
       <div id="qrStatus" style="position:absolute;bottom:8px;left:0;right:0;
         text-align:center;color:#fff;font-size:12px;
         text-shadow:0 1px 3px rgba(0,0,0,0.8)">Aponte para o QR Code...</div>
+      <div id="qrDebug" style="position:absolute;top:8px;left:8px;right:48px;
+        background:rgba(0,0,0,0.6);color:#0f0;font-size:10px;padding:4px;
+        border-radius:4px;word-break:break-all;max-height:80px;overflow:hidden"></div>
     </div>
     <div style="text-align:center;margin-top:6px">
       <a href="#" onclick="mostrarCampoManual(); return false" style="font-size:12px;color:var(--text3)">ou colar a URL/chave manualmente</a>
@@ -1721,9 +1724,13 @@ function _processarFrameQR() {
   var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   var qrStatus = document.getElementById('qrStatus');
+  var qrDebug = document.getElementById('qrDebug');
+
+  if (qrDebug) qrDebug.textContent = 'Frame: ' + canvas.width + 'x' + canvas.height + ' | zbar: OK';
 
   window._zbarScanImageData(imageData).then(function(symbols) {
     if (!_qrScanning) return;
+    if (qrDebug) qrDebug.textContent = 'Symbols: ' + (symbols ? symbols.length : 0) + ' | ' + canvas.width + 'x' + canvas.height;
     if (symbols && symbols.length > 0) {
       var qr = symbols[0].decode();
       if (qr && qr.startsWith('http')) {
@@ -1742,7 +1749,8 @@ function _processarFrameQR() {
       qrStatus.textContent = 'Procurando QR... (' + _qrTentativas + ')';
     }
     _qrAnimFrame = setTimeout(_processarFrameQR, 200);
-  }).catch(function() {
+  }).catch(function(err) {
+    if (qrDebug) qrDebug.textContent = 'ERRO: ' + (err && err.message ? err.message : err);
     if (_qrScanning) _qrAnimFrame = setTimeout(_processarFrameQR, 300);
   });
 }
