@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v39</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v40</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1658,8 +1658,8 @@ function iniciarCameraQR() {
     var script = document.createElement('script');
     script.type = 'module';
     script.textContent = [
-      'import { scanImageData } from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js";',
-      'window._zbarScanImageData = scanImageData;',
+      'import * as zbarWasm from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js";',
+      'window._zbarScanImageData = zbarWasm.scanImageData;',
       'window._zbarWasmLoaded = true;',
       'window.dispatchEvent(new Event("zbar-ready"));'
     ].join('\n');
@@ -1730,8 +1730,8 @@ function lerComNimiq(file) {
   var script = document.createElement('script');
   script.type = 'module';
   script.textContent = [
-    'import { scanImageData } from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js";',
-    'window._zbarScanImageData = scanImageData;',
+    'import * as zbarWasm from "https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js";',
+    'window._zbarScanImageData = zbarWasm.scanImageData;',
     'window._zbarWasmLoaded = true;',
     'window.dispatchEvent(new Event("zbar-ready"));'
   ].join('\n');
