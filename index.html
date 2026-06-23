@@ -135,7 +135,7 @@
   <div class="header">
     <div class="logo"><img src="icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:4px"></div>
     <div>
-      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v40</span></div>
+      <div class="htitle">Pão Duro <span class="counter" id="itemCount">0</span> <span id="appVersion" style="font-size:10px;color:var(--text3);font-weight:400;vertical-align:middle">23/06 · v41</span></div>
       <div class="hsub" id="appSub">Leitor de cupom fiscal</div>
     </div>
     <button class="btn btn-gray btn-sm ml-auto" style="width:auto;margin-right:4px" onclick="configurarChave()" title="Configurar chave Gemini">
@@ -1639,6 +1639,14 @@ function iniciarCameraQR() {
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     }).then(function(stream) {
       _qrStream = stream;
+      // Tenta aplicar zoom 2x via track constraints (suportado em Chrome/Android)
+      var track = stream.getVideoTracks()[0];
+      if (track) {
+        var caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.zoom && caps.zoom.max >= 2) {
+          track.applyConstraints({ advanced: [{ zoom: 2 }] }).catch(function(){});
+        }
+      }
       video.srcObject = stream;
       video.play();
       video.addEventListener('loadedmetadata', function() {
@@ -1688,9 +1696,15 @@ function _processarFrameQR() {
   canvas.height = video.videoHeight;
   var ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0);
-  var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-  window._zbarScanImageData(imageData).then(function(symbols) {
+  // Crop central 2x — foca no centro onde o QR code geralmente está
+  var cw = Math.floor(canvas.width / 2);
+  var ch = Math.floor(canvas.height / 2);
+  var cx = Math.floor(canvas.width / 4);
+  var cy = Math.floor(canvas.height / 4);
+  var croppedData = ctx.getImageData(cx, cy, cw, ch);
+
+  window._zbarScanImageData(croppedData).then(function(symbols) {
     if (!_qrScanning) return;
     if (symbols && symbols.length > 0) {
       var qr = symbols[0].decode();
